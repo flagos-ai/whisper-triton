@@ -1,3 +1,5 @@
+@../common/CLAUDE.md
+
 # Whisper — CNPort 移植项目说明
 
 ## 项目简介
