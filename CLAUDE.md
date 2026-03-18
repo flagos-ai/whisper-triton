@@ -10,7 +10,7 @@ Whisper 是 OpenAI 开源的通用语音识别模型，基于 Transformer 序列
 本仓库是 CNPort 项目对 `openai/whisper` 的移植版本，针对不同芯片平台（CUDA、AMD、Apple）维护独立分支。
 
 - upstream: https://github.com/openai/whisper
-- 公司仓库 (origin): https://code.iflytek.com/HY_CNPort/whisper.git
+- 公司仓库 (origin): https://codeup.aliyun.com/69b0f1246ec1ba182dc75e1c/HY_CNPort/whisper.git（~~旧：https://code.iflytek.com/HY_CNPort/whisper.git，已弃用~~）
 - 主跟踪分支: `main`
 - 当前版本: v20250625
 
@@ -192,10 +192,10 @@ git push origin platform/cuda --force-with-lease
 # 对 platform/amd、platform/apple 重复以上操作
 ```
 
-**注意**: 推送到公司仓库时必须绕过代理：
+**注意**: 推送到公司仓库（codeup.aliyun.com）无需绕过代理：
 
 ```bash
-no_proxy="code.iflytek.com" NO_PROXY="code.iflytek.com" git push origin platform/cuda
+git push origin platform/cuda
 ```
 
 ### 移植原则
