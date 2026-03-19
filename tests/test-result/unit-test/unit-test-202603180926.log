@@ -1,0 +1,35 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.0.2, pluggy-1.6.0 -- /data/hlgao5/HY_CNPort/venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/hlgao5/HY_CNPort/whisper
+configfile: pyproject.toml
+plugins: anyio-4.12.1
+collecting ... collected 25 items
+
+tests/test_audio.py::test_audio PASSED                                   [  4%]
+tests/test_tokenizer.py::test_tokenizer[True] PASSED                     [  8%]
+tests/test_tokenizer.py::test_tokenizer[False] PASSED                    [ 12%]
+tests/test_tokenizer.py::test_multilingual_tokenizer PASSED              [ 16%]
+tests/test_tokenizer.py::test_split_on_unicode PASSED                    [ 20%]
+tests/test_normalizer.py::test_number_normalizer[std0] PASSED            [ 24%]
+tests/test_normalizer.py::test_number_normalizer[std1] PASSED            [ 28%]
+tests/test_normalizer.py::test_spelling_normalizer PASSED                [ 32%]
+tests/test_normalizer.py::test_text_normalizer PASSED                    [ 36%]
+tests/test_timing.py::test_dtw[10-20] PASSED                             [ 40%]
+tests/test_timing.py::test_dtw[32-16] PASSED                             [ 44%]
+tests/test_timing.py::test_dtw[123-1500] PASSED                          [ 48%]
+tests/test_timing.py::test_dtw[234-189] PASSED                           [ 52%]
+tests/test_timing.py::test_dtw_cuda_equivalence[10-20] PASSED            [ 56%]
+tests/test_timing.py::test_dtw_cuda_equivalence[32-16] PASSED            [ 60%]
+tests/test_timing.py::test_dtw_cuda_equivalence[123-1500] PASSED         [ 64%]
+tests/test_timing.py::test_dtw_cuda_equivalence[234-189] PASSED          [ 68%]
+tests/test_timing.py::test_median_filter[shape0] PASSED                  [ 72%]
+tests/test_timing.py::test_median_filter[shape1] PASSED                  [ 76%]
+tests/test_timing.py::test_median_filter[shape2] PASSED                  [ 80%]
+tests/test_timing.py::test_median_filter[shape3] PASSED                  [ 84%]
+tests/test_timing.py::test_median_filter_equivalence[shape0] PASSED      [ 88%]
+tests/test_timing.py::test_median_filter_equivalence[shape1] PASSED      [ 92%]
+tests/test_timing.py::test_median_filter_equivalence[shape2] PASSED      [ 96%]
+tests/test_timing.py::test_median_filter_equivalence[shape3] PASSED      [100%]
+
+============================= 25 passed in 17.29s ==============================

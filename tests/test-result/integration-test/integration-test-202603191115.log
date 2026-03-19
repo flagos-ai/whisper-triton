@@ -1,0 +1,29 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.0.2, pluggy-1.6.0 -- /data/hlgao5/HY_CNPort/venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/hlgao5/HY_CNPort/whisper
+configfile: pyproject.toml
+plugins: anyio-4.12.1
+collecting ... collected 12 items
+
+tests/test_transcribe.py::test_transcribe[tiny.en] PASSED                [  8%]
+tests/test_transcribe.py::test_transcribe[tiny] PASSED                   [ 16%]
+tests/test_transcribe.py::test_transcribe[base.en] PASSED                [ 25%]
+tests/test_transcribe.py::test_transcribe[base] PASSED                   [ 33%]
+tests/test_transcribe.py::test_transcribe[small.en] PASSED               [ 41%]
+tests/test_transcribe.py::test_transcribe[small] PASSED                  [ 50%]
+tests/test_transcribe.py::test_transcribe[medium.en] PASSED              [ 58%]
+tests/test_transcribe.py::test_transcribe[medium] PASSED                 [ 66%]
+tests/test_transcribe.py::test_transcribe[large-v1] PASSED               [ 75%]
+tests/test_transcribe.py::test_transcribe[large-v2] PASSED               [ 83%]
+tests/test_transcribe.py::test_transcribe[large-v3] PASSED               [ 91%]
+tests/test_transcribe.py::test_transcribe[large] PASSED                  [100%]
+
+=============================== warnings summary ===============================
+tests/test_transcribe.py: 12 warnings
+  /data/hlgao5/HY_CNPort/whisper/whisper/__init__.py:146: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+    checkpoint = torch.load(fp, map_location=device)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 12 passed, 12 warnings in 120.99s (0:02:00) ==================
+--- Exit code: 0
