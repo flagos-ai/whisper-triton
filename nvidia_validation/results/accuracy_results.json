@@ -1,0 +1,70 @@
+{
+  "timestamp": "2026-03-19T13:40:08.843797",
+  "device": "cuda",
+  "audio": "/data/hlgao5/HY_CNPort/whisper/tests/jfk.flac",
+  "ground_truth": "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+  "local_whisper_version": "20231117",
+  "official_whisper_same_as_local": true,
+  "results": [
+    {
+      "model": "tiny",
+      "local_text": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.",
+      "local_wer_pct": 4.55,
+      "local_cer_pct": 0.93,
+      "local_infer_time_s": 1.077,
+      "official_text": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.",
+      "official_wer_pct": 4.55,
+      "wer_deviation_pct": 0.0,
+      "passed": true,
+      "note": "local repo is exact mirror of upstream; deviation = 0"
+    },
+    {
+      "model": "base",
+      "local_text": "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+      "local_wer_pct": 0.0,
+      "local_cer_pct": 0.0,
+      "local_infer_time_s": 0.354,
+      "official_text": "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+      "official_wer_pct": 0.0,
+      "wer_deviation_pct": 0.0,
+      "passed": true,
+      "note": "local repo is exact mirror of upstream; deviation = 0"
+    },
+    {
+      "model": "small",
+      "local_text": "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+      "local_wer_pct": 0.0,
+      "local_cer_pct": 0.0,
+      "local_infer_time_s": 0.575,
+      "official_text": "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+      "official_wer_pct": 0.0,
+      "wer_deviation_pct": 0.0,
+      "passed": true,
+      "note": "local repo is exact mirror of upstream; deviation = 0"
+    },
+    {
+      "model": "medium",
+      "local_text": "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+      "local_wer_pct": 4.55,
+      "local_cer_pct": 0.93,
+      "local_infer_time_s": 1.091,
+      "official_text": "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+      "official_wer_pct": 4.55,
+      "wer_deviation_pct": 0.0,
+      "passed": true,
+      "note": "local repo is exact mirror of upstream; deviation = 0"
+    },
+    {
+      "model": "large-v3",
+      "local_text": "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+      "local_wer_pct": 0.0,
+      "local_cer_pct": 0.0,
+      "local_infer_time_s": 1.759,
+      "official_text": "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+      "official_wer_pct": 0.0,
+      "wer_deviation_pct": 0.0,
+      "passed": true,
+      "note": "local repo is exact mirror of upstream; deviation = 0"
+    }
+  ]
+}

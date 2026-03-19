@@ -1,0 +1,123 @@
+{
+  "system": {
+    "os": "Linux-5.15.0-25-generic-x86_64-with-glibc2.35",
+    "architecture": "x86_64",
+    "python": "3.10.12",
+    "hostname": "dlp2-14-241"
+  },
+  "gpu": {
+    "available": true,
+    "count": 8,
+    "cuda_driver_version": "N/A",
+    "gpus": [
+      {
+        "name": "NVIDIA A40",
+        "driver": "550.163.01",
+        "memory_total": "46068 MiB",
+        "compute_capability": "8.6"
+      },
+      {
+        "name": "NVIDIA A40",
+        "driver": "550.163.01",
+        "memory_total": "46068 MiB",
+        "compute_capability": "8.6"
+      },
+      {
+        "name": "NVIDIA A40",
+        "driver": "550.163.01",
+        "memory_total": "46068 MiB",
+        "compute_capability": "8.6"
+      },
+      {
+        "name": "NVIDIA A40",
+        "driver": "550.163.01",
+        "memory_total": "46068 MiB",
+        "compute_capability": "8.6"
+      },
+      {
+        "name": "NVIDIA A40",
+        "driver": "550.163.01",
+        "memory_total": "46068 MiB",
+        "compute_capability": "8.6"
+      },
+      {
+        "name": "NVIDIA A40",
+        "driver": "550.163.01",
+        "memory_total": "46068 MiB",
+        "compute_capability": "8.6"
+      },
+      {
+        "name": "NVIDIA A40",
+        "driver": "550.163.01",
+        "memory_total": "46068 MiB",
+        "compute_capability": "8.6"
+      },
+      {
+        "name": "NVIDIA A40",
+        "driver": "550.163.01",
+        "memory_total": "46068 MiB",
+        "compute_capability": "8.6"
+      }
+    ]
+  },
+  "torch": {
+    "version": "2.4.1+cu124",
+    "cuda_available": true,
+    "cuda_version": "12.4",
+    "cudnn_version": "90100",
+    "device_count": 8,
+    "current_device": "NVIDIA A40"
+  },
+  "triton": {
+    "version": "3.0.0",
+    "available": true
+  },
+  "whisper": {
+    "version": "20231117",
+    "available_models": [
+      "tiny.en",
+      "tiny",
+      "base.en",
+      "base",
+      "small.en",
+      "small",
+      "medium.en",
+      "medium",
+      "large-v1",
+      "large-v2",
+      "large-v3",
+      "large"
+    ],
+    "cached_models": [
+      "base",
+      "base.en",
+      "large-v1",
+      "large-v2",
+      "large-v3",
+      "medium",
+      "medium.en",
+      "small",
+      "small.en",
+      "tiny",
+      "tiny.en"
+    ],
+    "cache_dir": "/data/hlgao5/whisper-cache/whisper"
+  },
+  "packages": {
+    "torch": "2.4.1+cu124",
+    "triton": "3.0.0",
+    "tiktoken": "0.12.0",
+    "numba": "0.64.0",
+    "numpy": "2.2.6",
+    "scipy": "1.15.3",
+    "torchaudio": "2.4.1+cu124",
+    "jiwer": "4.0.0",
+    "soundfile": "0.13.1"
+  },
+  "smoke_test": {
+    "status": "PASSED",
+    "device": "cuda",
+    "model": "tiny",
+    "transcription_snippet": "And so my fellow Americans ask not what your country can do for you, ask what yo"
+  }
+}
