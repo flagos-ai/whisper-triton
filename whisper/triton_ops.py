@@ -6,8 +6,11 @@ import torch
 try:
     import triton
     import triton.language as tl
-except ImportError:
-    raise RuntimeError("triton import failed; try `pip install --pre triton`")
+except ImportError as e:
+    raise RuntimeError(
+        f"triton import failed ({e}); install the Triton package that matches "
+        "your accelerator backend. CUDA users can install `triton`."
+    )
 
 
 @triton.jit
