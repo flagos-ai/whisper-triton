@@ -52,16 +52,17 @@ def test_dtw(N: int, M: int):
     assert np.allclose(trace, dtw_trace)
 
 
+@pytest.mark.requires_accelerator
 @pytest.mark.requires_cuda
 @pytest.mark.parametrize("N, M", sizes)
-def test_dtw_cuda_equivalence(N: int, M: int):
+def test_dtw_cuda_equivalence(N: int, M: int, accelerator_device: torch.device):
     x_numpy = np.random.randn(N, M).astype(np.float32)
-    x_cuda = torch.from_numpy(x_numpy).cuda()
+    x_accel = torch.from_numpy(x_numpy).to(accelerator_device)
 
     trace_cpu = dtw_cpu(x_numpy)
-    trace_cuda = dtw_cuda(x_cuda)
+    trace_accel = dtw_cuda(x_accel)
 
-    assert np.allclose(trace_cpu, trace_cuda)
+    assert np.allclose(trace_cpu, trace_accel)
 
 
 @pytest.mark.parametrize("shape", shapes)
@@ -84,13 +85,14 @@ def test_median_filter(shape):
         assert np.allclose(filtered, scipy_filtered)
 
 
+@pytest.mark.requires_accelerator
 @pytest.mark.requires_cuda
 @pytest.mark.parametrize("shape", shapes)
-def test_median_filter_equivalence(shape):
+def test_median_filter_equivalence(shape, accelerator_device: torch.device):
     x = torch.randn(*shape)
 
     for filter_width in [3, 5, 7, 13]:
         filtered_cpu = median_filter(x, filter_width)
-        filtered_gpu = median_filter(x.cuda(), filter_width).cpu()
+        filtered_accel = median_filter(x.to(accelerator_device), filter_width).cpu()
 
-        assert np.allclose(filtered_cpu, filtered_gpu)
+        assert np.allclose(filtered_cpu, filtered_accel)

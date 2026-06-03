@@ -33,16 +33,18 @@ def median_filter(x: torch.Tensor, filter_width: int):
 
     result = None
     x = F.pad(x, (filter_width // 2, filter_width // 2, 0, 0), mode="reflect")
-    if x.is_cuda:
+    if x.device.type != "cpu":
         try:
             from .triton_ops import median_filter_cuda
 
             result = median_filter_cuda(x, filter_width)
-        except (RuntimeError, subprocess.CalledProcessError):
+        except Exception as e:
             warnings.warn(
-                "Failed to launch Triton kernels, likely due to missing CUDA toolkit; "
-                "falling back to a slower median kernel implementation..."
+                f"Failed to launch Triton median kernel on the current accelerator "
+                f"({type(e).__name__}: {e}); "
+                "falling back to a slower CPU median implementation..."
             )
+            x = x.cpu()
 
     if result is None:
         # sort() is faster than torch.median (https://github.com/pytorch/pytorch/issues/51450)
@@ -139,13 +141,14 @@ def dtw_cuda(x, BLOCK_SIZE=1024):
 
 
 def dtw(x: torch.Tensor) -> np.ndarray:
-    if x.is_cuda:
+    if x.device.type != "cpu":
         try:
             return dtw_cuda(x)
-        except (RuntimeError, subprocess.CalledProcessError):
+        except Exception as e:
             warnings.warn(
-                "Failed to launch Triton kernels, likely due to missing CUDA toolkit; "
-                "falling back to a slower DTW implementation..."
+                f"Failed to launch Triton DTW kernel on the current accelerator "
+                f"({type(e).__name__}: {e}); "
+                "falling back to a slower CPU DTW implementation..."
             )
 
     return dtw_cpu(x.double().cpu().numpy())
