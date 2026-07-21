@@ -1,118 +1,54 @@
-# Whisper
+# Whisper CNPort
 
-[[Blog]](https://openai.com/blog/whisper)
-[[Paper]](https://arxiv.org/abs/2212.04356)
-[[Model card]](https://github.com/openai/whisper/blob/main/model-card.md)
-[[Colab example]](https://colab.research.google.com/github/openai/whisper/blob/master/notebooks/LibriSpeech.ipynb)
+Whisper CNPort 基于 [OpenAI Whisper](https://github.com/openai/whisper)，目标是在保持 Whisper Python API、命令行接口、模型推理实现和模型格式不变的前提下，在 NVIDIA、华为昇腾、寒武纪、摩尔线程、海光和阿里平头哥平台完成编译与功能验证。
 
-Whisper is a general-purpose speech recognition model. It is trained on a large dataset of diverse audio and is also a multitasking model that can perform multilingual speech recognition, speech translation, and language identification.
+本仓库当前跟踪的上游基线为 `v20250625`。OpenAI 原始 README 保存在 [README_UPSTREAM.md](README_UPSTREAM.md)，许可证见 [LICENSE](LICENSE)。
 
+## 主要兼容改动
 
-## Approach
+- Whisper 的 Encoder/Decoder 仍由各平台厂商提供的 PyTorch 后端执行。
+- 词级时间戳使用的 `dtw_kernel` 和 `median_kernel` 保持一份 Triton 源码，由当前环境中的平台 Triton JIT 编译。
+- 仅 `whisper/timing.py` 对非 CPU 张量尝试执行这两个 Triton kernel；Whisper 不新增厂商模型推理后端，也不替用户选择厂商设备。
+- Triton 不再作为 Whisper 的通用安装依赖。各平台必须预先安装与本机 PyTorch、SDK 和设备后端匹配的 Triton 发行版。
+- Triton 不可用或编译失败时，词级时间戳计算会给出警告并回退到较慢的 CPU 实现。
 
-![Approach](https://raw.githubusercontent.com/openai/whisper/main/approach.png)
+## 支持平台
 
-A Transformer sequence-to-sequence model is trained on various speech processing tasks, including multilingual speech recognition, speech translation, spoken language identification, and voice activity detection. These tasks are jointly represented as a sequence of tokens to be predicted by the decoder, allowing a single model to replace many stages of a traditional speech-processing pipeline. The multitask training format uses a set of special tokens that serve as task specifiers or classification targets.
+| 平台 | 常见 Torch 设备 | Triton backend/产物 | 支持方式 |
+|---|---|---|---|
+| NVIDIA | `cuda` | NVIDIA / cubin | PyTorch CUDA + PyPI/配套 Triton |
+| 华为昇腾 | `npu` | Ascend / npubin | `torch_npu` + 昇腾 Triton |
+| 寒武纪 | `mlu` | MLU / cnbin | `torch_mlu` + MLU Triton |
+| 摩尔线程 | `musa` | MTGPU / mubin | `torch_musa` + MUSA Triton |
+| 海光 | `cuda` 或 HIP 兼容设备 | AMD/HIP / hsaco | 厂商 PyTorch + 配套 ROCm/HIP Triton |
+| 阿里平头哥 | CUDA 兼容设备 | 平台工具链产物 | PPU SDK、厂商 PyTorch 和配套 Triton |
 
+“支持”要求环境检查、Triton kernel 直连等价测试和当前版本的全模型集成测试全部通过。具体版本组合与验收方法见 [多平台安装与验证指南](docs/multi-platform.md)。
 
-## Setup
+## 安装
 
-We used Python 3.9.9 and [PyTorch](https://pytorch.org/) 1.10.1 to train and test our models, but the codebase is expected to be compatible with Python 3.8-3.11 and recent PyTorch versions. The codebase also depends on a few Python packages, most notably [OpenAI's tiktoken](https://github.com/openai/tiktoken) for their fast tokenizer implementation. You can download and install (or update to) the latest release of Whisper with the following command:
-
-    pip install -U openai-whisper
-
-Alternatively, the following command will pull and install the latest commit from this repository, along with its Python dependencies:
-
-    pip install git+https://github.com/openai/whisper.git 
-
-To update the package to the latest version of this repository, please run:
-
-    pip install --upgrade --no-deps --force-reinstall git+https://github.com/openai/whisper.git
-
-It also requires the command-line tool [`ffmpeg`](https://ffmpeg.org/) to be installed on your system, which is available from most package managers:
+不要在多个厂商平台之间复用同一个 Python 环境。建议每个平台使用独立 venv 或容器，并使用同一个 Python 解释器完成安装和测试。
 
 ```bash
-# on Ubuntu or Debian
-sudo apt update && sudo apt install ffmpeg
+# 1. 按厂商文档安装驱动/SDK、PyTorch、设备扩展和配套 Triton
+# 2. 安装 Whisper 的其余依赖，避免 pip 改写厂商 Torch/Triton
+python -m pip install numba numpy tqdm more-itertools tiktoken
+python -m pip install -e . --no-deps
 
-# on Arch Linux
-sudo pacman -S ffmpeg
-
-# on MacOS using Homebrew (https://brew.sh/)
-brew install ffmpeg
-
-# on Windows using Chocolatey (https://chocolatey.org/)
-choco install ffmpeg
-
-# on Windows using Scoop (https://scoop.sh/)
-scoop install ffmpeg
+# 开发和测试依赖
+python -m pip install pytest scipy
 ```
 
-You may need [`rust`](http://rust-lang.org) installed as well, in case [tiktoken](https://github.com/openai/tiktoken) does not provide a pre-built wheel for your platform. If you see installation errors during the `pip install` command above, please follow the [Getting started page](https://www.rust-lang.org/learn/get-started) to install Rust development environment. Additionally, you may need to configure the `PATH` environment variable, e.g. `export PATH="$HOME/.cargo/bin:$PATH"`. If the installation fails with `No module named 'setuptools_rust'`, you need to install `setuptools_rust`, e.g. by running:
+Whisper 还需要系统命令 `ffmpeg`：
 
 ```bash
-pip install setuptools-rust
+ffmpeg -version
+python scripts/check_accelerator_env.py --platform auto
 ```
 
+## 使用
 
-## Available models and languages
-
-There are six model sizes, four with English-only versions, offering speed and accuracy tradeoffs.
-Below are the names of the available models and their approximate memory requirements and inference speed relative to the large model.
-The relative speeds below are measured by transcribing English speech on a A100, and the real-world speed may vary significantly depending on many factors including the language, the speaking speed, and the available hardware.
-
-|  Size  | Parameters | English-only model | Multilingual model | Required VRAM | Relative speed |
-|:------:|:----------:|:------------------:|:------------------:|:-------------:|:--------------:|
-|  tiny  |    39 M    |     `tiny.en`      |       `tiny`       |     ~1 GB     |      ~10x      |
-|  base  |    74 M    |     `base.en`      |       `base`       |     ~1 GB     |      ~7x       |
-| small  |   244 M    |     `small.en`     |      `small`       |     ~2 GB     |      ~4x       |
-| medium |   769 M    |    `medium.en`     |      `medium`      |     ~5 GB     |      ~2x       |
-| large  |   1550 M   |        N/A         |      `large`       |    ~10 GB     |       1x       |
-| turbo  |   809 M    |        N/A         |      `turbo`       |     ~6 GB     |      ~8x       |
-
-The `.en` models for English-only applications tend to perform better, especially for the `tiny.en` and `base.en` models. We observed that the difference becomes less significant for the `small.en` and `medium.en` models.
-Additionally, the `turbo` model is an optimized version of `large-v3` that offers faster transcription speed with a minimal degradation in accuracy.
-
-Whisper's performance varies widely depending on the language. The figure below shows a performance breakdown of `large-v3` and `large-v2` models by language, using WERs (word error rates) or CER (character error rates, shown in *Italic*) evaluated on the Common Voice 15 and Fleurs datasets. Additional WER/CER metrics corresponding to the other models and datasets can be found in Appendix D.1, D.2, and D.4 of [the paper](https://arxiv.org/abs/2212.04356), as well as the BLEU (Bilingual Evaluation Understudy) scores for translation in Appendix D.3.
-
-![WER breakdown by language](https://github.com/openai/whisper/assets/266841/f4619d66-1058-4005-8f67-a9d811b77c62)
-
-## Command-line usage
-
-The following command will transcribe speech in audio files, using the `turbo` model:
-
-```bash
-whisper audio.flac audio.mp3 audio.wav --model turbo
-```
-
-The default setting (which selects the `turbo` model) works well for transcribing English. However, **the `turbo` model is not trained for translation tasks**. If you need to **translate non-English speech into English**, use one of the **multilingual models** (`tiny`, `base`, `small`, `medium`, `large`) instead of `turbo`. 
-
-For example, to transcribe an audio file containing non-English speech, you can specify the language:
-
-```bash
-whisper japanese.wav --language Japanese
-```
-
-To **translate** speech into English, use:
-
-```bash
-whisper japanese.wav --model medium --language Japanese --task translate
-```
-
-> **Note:** The `turbo` model will return the original language even if `--task translate` is specified. Use `medium` or `large` for the best translation results.
-
-Run the following to view all available options:
-
-```bash
-whisper --help
-```
-
-See [tokenizer.py](https://github.com/openai/whisper/blob/main/whisper/tokenizer.py) for the list of all available languages.
-
-
-## Python usage
-
-Transcription can also be performed within Python: 
+Python API 与上游保持一致：
 
 ```python
 import whisper
@@ -122,39 +58,38 @@ result = model.transcribe("audio.mp3")
 print(result["text"])
 ```
 
-Internally, the `transcribe()` method reads the entire file and processes the audio with a sliding 30-second window, performing autoregressive sequence-to-sequence predictions on each window.
+非 CUDA 平台由调用方按厂商 PyTorch 文档显式传入设备，例如
+`whisper.load_model("turbo", device="<torch-device>")`。CNPort 不在产品代码中维护
+NPU、MLU、MUSA 等模型推理设备的探测或调度逻辑。
 
-Below is an example usage of `whisper.detect_language()` and `whisper.decode()` which provide lower-level access to the model.
+命令行示例：
 
-```python
-import whisper
-
-model = whisper.load_model("turbo")
-
-# load audio and pad/trim it to fit 30 seconds
-audio = whisper.load_audio("audio.mp3")
-audio = whisper.pad_or_trim(audio)
-
-# make log-Mel spectrogram and move to the same device as the model
-mel = whisper.log_mel_spectrogram(audio, n_mels=model.dims.n_mels).to(model.device)
-
-# detect the spoken language
-_, probs = model.detect_language(mel)
-print(f"Detected language: {max(probs, key=probs.get)}")
-
-# decode the audio
-options = whisper.DecodingOptions()
-result = whisper.decode(model, mel, options)
-
-# print the recognized text
-print(result.text)
+```bash
+whisper audio.wav --model turbo --output_dir outputs
 ```
 
-## More examples
+这里的 `--output_dir` 仅控制转录文件输出，默认是当前目录；它不是 pytest 测试报告目录。
 
-Please use the [🙌 Show and tell](https://github.com/openai/whisper/discussions/categories/show-and-tell) category in Discussions for sharing more example usages of Whisper and third-party extensions such as web demos, integrations with other tools, ports for different platforms, etc.
+## 测试
 
+上游 pytest 默认只向终端输出，不创建统一报告目录。CNPort 提供统一 runner：
 
-## License
+```bash
+python scripts/run_platform_tests.py --platform nvidia-a40
+```
 
-Whisper's code and model weights are released under the MIT License. See [LICENSE](https://github.com/openai/whisper/blob/main/LICENSE) for further details.
+默认产物位于：
+
+```text
+tests/results/<platform>/<YYYYMMDDHHMMSS>/
+```
+
+逐次日志和机器环境信息默认不提交 Git。发布支持声明前，应为六个平台分别保留一份经过脱敏的验证摘要。
+
+## 上游与许可证
+
+- 上游项目：[openai/whisper](https://github.com/openai/whisper)
+- 上游说明：[README_UPSTREAM.md](README_UPSTREAM.md)
+- 许可证：[MIT License](LICENSE)
+
+本项目未修改 Whisper 模型权重的许可证或格式。使用模型前请同时阅读上游模型卡和使用限制。

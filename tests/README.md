@@ -6,7 +6,7 @@
 
 ## 文件总览
 
-| 文件 | 类型 | 需要 GPU | 需要模型文件 | 运行速度 |
+| 文件 | 类型 | 需要加速器 | 需要模型文件 | 运行速度 |
 |------|------|---------|------------|---------|
 | `test_audio.py` | 单元测试 | 否 | 否 | 秒级 |
 | `test_tokenizer.py` | 单元测试 | 否 | 否 | 秒级 |
@@ -20,11 +20,11 @@
 
 ### `conftest.py` — pytest 全局配置
 
-注册自定义 marker `requires_cuda`，供 `test_timing.py` 中的 CUDA 测试使用，便于在无 GPU 环境中选择性跳过。
+注册 `requires_accelerator` marker，并保留 `requires_cuda` 作为兼容别名。测试会发现 CUDA 或由 `torch_npu`、`torch_mlu`、`torch_musa` 注册的 PrivateUse1 设备；也可用 `WHISPER_TEST_DEVICE` 显式指定厂商 PyTorch 设备。无加速器时自动跳过直连 kernel 测试。设备选择只属于测试逻辑，不修改 Whisper 的模型推理设备策略。
 
 ```bash
-# 跳过所有 requires_cuda 测试
-pytest tests/ -m "not requires_cuda"
+# 跳过所有加速器测试
+pytest tests/ -m "not requires_accelerator and not requires_cuda"
 ```
 
 ---
@@ -82,9 +82,11 @@ DTW（动态时间规整）是词级时间戳（word timestamps）功能的核�
 | 测试函数 | marker | 验证内容 |
 |---------|--------|---------|
 | `test_dtw` | 无 | CPU DTW 正确性：构造已知最优路径的矩阵，验证返回路径与预期一致，覆盖 4 种矩阵尺寸 |
-| `test_dtw_cuda_equivalence` | `requires_cuda` | CUDA DTW 与 CPU DTW 在 4 种矩阵尺寸下结果一致 |
+| `test_dtw_accelerator_equivalence` | `requires_accelerator` | 加速器 Triton DTW 与 CPU DTW 在 4 种矩阵尺寸下结果一致 |
 | `test_median_filter` | 无 | CPU median filter 正确性：与 scipy 参考实现对比，覆盖 4 种 tensor 形状 × 4 种窗宽 |
-| `test_median_filter_equivalence` | `requires_cuda` | GPU median filter 与 CPU 结果一致 |
+| `test_median_filter_accelerator_equivalence` | `requires_accelerator` | 加速器 median filter 与 CPU 结果一致 |
+| `test_median_filter_accelerator_kernel_equivalence` | `requires_accelerator` | 直接启动 Triton median kernel，避免 CPU fallback 掩盖失败 |
+| `test_timing_falls_back_to_cpu` | `requires_accelerator` | 模拟 Triton 编译失败，验证两个 timing 算法回退到 CPU |
 
 ---
 
@@ -116,8 +118,8 @@ DTW（动态时间规整）是词级时间戳（word timestamps）功能的核�
 # 运行全部单元测试（不含集成测试）
 pytest tests/test_audio.py tests/test_tokenizer.py tests/test_normalizer.py tests/test_timing.py -v
 
-# 跳过需要 CUDA 的测试
-pytest tests/ -m "not requires_cuda" --ignore=tests/test_transcribe.py
+# 跳过加速器直连和集成测试
+pytest tests/ -m "not requires_accelerator and not requires_cuda" --ignore=tests/test_transcribe.py
 
 # 运行集成测试（单个模型，避免全量下载）
 pytest tests/test_transcribe.py -k "base" -v
@@ -130,24 +132,10 @@ pytest tests/ -v
 
 ## 测试结果归档
 
-> **当前状态**：测试脚本本身不包含结果归档逻辑，输出仅打印到终端。
->
-> 按 CNPort 项目规范，测试报告归档至本目录下：
-> ```
-> tests/test-result/
-> ├── unit-test/
-> │   └── unit-test-YYYYMMDDHHmm.log
-> └── integration-test/
->     └── integration-test-YYYYMMDDHHmm.log
-> ```
->
-> 手动归档方式（在仓库根目录执行）：
-> ```bash
-> # 单元测试
-> pytest tests/test_audio.py tests/test_tokenizer.py tests/test_normalizer.py tests/test_timing.py \
->     -v --tb=short 2>&1 | tee tests/test-result/unit-test/unit-test-$(date +%Y%m%d%H%M).log
->
-> # 集成测试
-> pytest tests/test_transcribe.py -v --tb=short \
->     2>&1 | tee tests/test-result/integration-test/integration-test-$(date +%Y%m%d%H%M).log
-> ```
+上游 pytest 本身不创建结果目录。CNPort 使用统一 runner：
+
+```bash
+python scripts/run_platform_tests.py --platform <platform-key>
+```
+
+结果写入 `tests/results/<platform>/<YYYYMMDDHHMMSS>/`，包含环境、命令、JUnit、日志、摘要和 Markdown 报告。逐次产物默认不提交 Git，格式说明见 `tests/results/README.md`。
