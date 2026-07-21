@@ -1,5 +1,4 @@
 import itertools
-import subprocess
 import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, List
@@ -38,11 +37,12 @@ def median_filter(x: torch.Tensor, filter_width: int):
             from .triton_ops import median_filter_cuda
 
             result = median_filter_cuda(x, filter_width)
-        except Exception as e:
+        except Exception as exc:
             warnings.warn(
-                f"Failed to launch Triton median kernel on the current accelerator "
-                f"({type(e).__name__}: {e}); "
-                "falling back to a slower CPU median implementation..."
+                "Failed to compile or launch the Triton median kernel on "
+                f"{x.device} ({type(exc).__name__}: {exc}); falling back to CPU",
+                RuntimeWarning,
+                stacklevel=2,
             )
             x = x.cpu()
 
@@ -144,11 +144,12 @@ def dtw(x: torch.Tensor) -> np.ndarray:
     if x.device.type != "cpu":
         try:
             return dtw_cuda(x)
-        except Exception as e:
+        except Exception as exc:
             warnings.warn(
-                f"Failed to launch Triton DTW kernel on the current accelerator "
-                f"({type(e).__name__}: {e}); "
-                "falling back to a slower CPU DTW implementation..."
+                "Failed to compile or launch the Triton DTW kernel on "
+                f"{x.device} ({type(exc).__name__}: {exc}); falling back to CPU",
+                RuntimeWarning,
+                stacklevel=2,
             )
 
     return dtw_cpu(x.double().cpu().numpy())
