@@ -12,7 +12,7 @@
 | `test_tokenizer.py` | 单元测试 | 否 | 否 | 秒级 |
 | `test_normalizer.py` | 单元测试 | 否 | 否 | 秒级 |
 | `test_timing.py` | 单元测试 | 部分 | 否 | 秒级 |
-| `test_transcribe.py` | 集成测试 | 推荐 | 是（全量） | 分钟~小时级 |
+| `test_transcribe.py` | 集成测试 | 否 | 是（全量） | 分钟~小时级 |
 
 ---
 

@@ -34,7 +34,8 @@ triton>=2; Linux x86_64
 4. 安装与该 Torch 和 SDK 组合一起验证过的 Triton；不要仅按包名或最高版本选择。
 5. 用同一个解释器显式安装 Whisper 的通用依赖，再执行 `python -m pip install -e . --no-deps`。
 6. 运行环境检查、kernel 直连测试和全模型集成测试。必要时设置
-   `WHISPER_TEST_DEVICE=<torch-device>`，让 pytest 在厂商 PyTorch 设备上执行模型推理。
+   `WHISPER_TEST_DEVICE=<torch-device>`，让 pytest 在厂商 PyTorch 设备上执行
+   `median_kernel` 和 `dtw_kernel` 的 Triton 编译调用测试。
 
 不要复制其他平台的 `site-packages`，也不要通过调整 `PYTHONPATH` 混用两个 Python 环境。升级 Torch、设备扩展、Triton 或 SDK 中任一项后，应把整个组合视为新环境重新验证。
 

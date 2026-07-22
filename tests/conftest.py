@@ -73,9 +73,3 @@ def accelerator_device():
     if device is None:
         pytest.skip("no PyTorch accelerator available")
     return device
-
-
-@pytest.fixture
-def inference_device():
-    """Select a test device without changing Whisper's runtime device policy."""
-    return _accelerator_device() or torch.device("cpu")
