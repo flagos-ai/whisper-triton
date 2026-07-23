@@ -10,8 +10,8 @@ import subprocess
 import sys
 from datetime import datetime
 
-WHISPER_CACHE = "/data/hlgao5/whisper-cache"
-os.environ["XDG_CACHE_HOME"] = WHISPER_CACHE
+WHISPER_CACHE = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
+os.environ.setdefault("XDG_CACHE_HOME", WHISPER_CACHE)
 
 
 def run_cmd(cmd):

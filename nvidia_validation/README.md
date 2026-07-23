@@ -56,17 +56,17 @@ nvidia_validation/
 
 ```bash
 # 激活项目虚拟环境
-source /data/hlgao5/HY_CNPort/venv/bin/activate
+source <venv-root>/bin/activate
 
 # 安装本地 whisper（开发模式）
-cd /data/hlgao5/HY_CNPort/whisper
+cd <repo-root>
 pip install -e .
 
 # 安装测试额外依赖
 pip install jiwer soundfile
 
 # 设置模型缓存路径（所有命令均需此环境变量）
-export XDG_CACHE_HOME=/data/hlgao5/whisper-cache
+export XDG_CACHE_HOME=<model-cache-root>
 
 # 确认 CUDA 可用
 python3 -c "import torch; print(torch.cuda.is_available())"
@@ -76,12 +76,14 @@ python3 -c "import torch; print(torch.cuda.is_available())"
 
 ## 执行方法
 
-所有脚本均在 whisper 仓库根目录（`/data/hlgao5/HY_CNPort/whisper`）下执行。
+所有脚本均在 Whisper 仓库根目录（下文记为 `<repo-root>`）执行。
+`XDG_CACHE_HOME` 应指向模型缓存的父目录，Whisper 权重实际位于
+`$XDG_CACHE_HOME/whisper/`；未设置时使用标准的 `~/.cache/whisper/`。
 
 ### 阶段一：环境检查
 
 ```bash
-XDG_CACHE_HOME=/data/hlgao5/whisper-cache \
+XDG_CACHE_HOME=<model-cache-root> \
 python3 nvidia_validation/env_test/check_env.py
 ```
 
@@ -100,11 +102,11 @@ python3 nvidia_validation/env_test/check_env.py
 ### 阶段二：准确率基准测试
 
 ```bash
-XDG_CACHE_HOME=/data/hlgao5/whisper-cache \
+XDG_CACHE_HOME=<model-cache-root> \
 python3 nvidia_validation/accuracy_benchmark/run_wer_benchmark.py
 
 # 可选：只测试指定模型
-XDG_CACHE_HOME=/data/hlgao5/whisper-cache \
+XDG_CACHE_HOME=<model-cache-root> \
 python3 nvidia_validation/accuracy_benchmark/run_wer_benchmark.py \
   --models tiny base small
 ```
@@ -121,15 +123,15 @@ python3 nvidia_validation/accuracy_benchmark/run_wer_benchmark.py \
 
 ```bash
 # 先生成测试音频（30s / 60s / 300s），只需执行一次
-XDG_CACHE_HOME=/data/hlgao5/whisper-cache \
+XDG_CACHE_HOME=<model-cache-root> \
 python3 nvidia_validation/perf_benchmark/generate_test_audio.py
 
 # 运行完整性能测试（约 20 分钟）
-XDG_CACHE_HOME=/data/hlgao5/whisper-cache \
+XDG_CACHE_HOME=<model-cache-root> \
 python3 nvidia_validation/perf_benchmark/run_perf_benchmark.py
 
 # 可选：只测试部分模型或时长
-XDG_CACHE_HOME=/data/hlgao5/whisper-cache \
+XDG_CACHE_HOME=<model-cache-root> \
 python3 nvidia_validation/perf_benchmark/run_perf_benchmark.py \
   --models tiny base small --durations 30 60
 ```
@@ -155,9 +157,9 @@ python3 nvidia_validation/generate_report.py
 ## 一键执行（全流程）
 
 ```bash
-cd /data/hlgao5/HY_CNPort/whisper
-source ../venv/bin/activate
-export XDG_CACHE_HOME=/data/hlgao5/whisper-cache
+cd <repo-root>
+source <venv-root>/bin/activate
+export XDG_CACHE_HOME=<model-cache-root>
 
 python3 nvidia_validation/env_test/check_env.py 2>/dev/null
 python3 nvidia_validation/accuracy_benchmark/run_wer_benchmark.py 2>/dev/null
