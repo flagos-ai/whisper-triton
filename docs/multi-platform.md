@@ -76,7 +76,7 @@ triton>=2; Linux x86_64
 |---|---|---|---|---|---|
 | NVIDIA A40 | 3.10 | `2.4.1+cu124` | `3.0.0` | `nvidia` | 已有历史全模型结果；发布前按当前模型集合重跑 |
 | 华为昇腾 CANN 8.5 | 3.10 | Torch `2.5.1`、`torch_npu 2.5.1` | 厂商环境已提供，公开版本号待实机复核 | `ascend` | 环境与 kernel 已盘点；全模型待发布验收 |
-| 寒武纪 MLU590 | 3.10.12 | Torch `2.9.1`、`torch_mlu 1.30.2+torch2.9.1` | `3.2.0` | `mlu` | 环境已盘点；全模型待发布验收 |
+| 寒武纪 MLU590 | 3.10.12 | Torch `2.9.1`、`torch_mlu 1.30.2+torch2.9.1` | `3.2.0` | `mlu` | 2026-07-23：DTW 直连通过；median 动态 kernel 编译失败并可回退 CPU；上游全模型用例在 CPU 通过，MLU 推理待验收 |
 | 摩尔线程 S5000 | 3.10 | Torch `2.7.1`、配套 `torch_musa` | `3.1.0+musa1.4.6` | `mtgpu` | 环境与 timing kernel 已盘点；全模型待发布验收 |
 | 海光/DTK兼容环境 | 3.10.16 | `2.4.1+das.opt1.dtk2504` | `3.0.0+das.opt3.dtk2504` | `amd` | DTK参考环境已盘点；目标海光设备仍须实机全模型验收 |
 | 平头哥 PPU-ZW810E | 3.10 | Torch `2.6.0` | `3.2.0` | `nvidia`兼容 | 环境已盘点；全模型待发布验收 |
@@ -101,6 +101,12 @@ python scripts/run_platform_tests.py --platform <platform-key>
 runner 执行环境检查后运行 `pytest tests/ -v`。`test_timing.py` 同时包含直接调用 Triton kernel 的测试，Triton 失败后走 CPU fallback 不能让直连测试误报成功。集成测试覆盖当前提交中 `whisper.available_models()` 返回的所有模型，因此模型集合随上游版本变化而自动更新。
 
 支持验收要求：环境检查通过、CPU 单测通过、两个 timing kernel 直连且与 CPU 结果等价、全模型集成测试通过、tiny 模型开启词级时间戳后端到端通过。
+
+注意：当前上游 `tests/test_transcribe.py` 只根据 `torch.cuda.is_available()` 选择
+CUDA 或 CPU，不读取 `WHISPER_TEST_DEVICE`。因此非 CUDA 平台即使设备探测成功，
+该文件通过也只证明 CPU 转录路径。非 CUDA 平台的发布验收必须另行运行显式传入
+厂商设备的全模型用例；后续应让转录集成测试复用 pytest 的统一 accelerator fixture，
+并在测试摘要中记录每个模型的实际 `model.device`。
 
 ## 输出约定
 
