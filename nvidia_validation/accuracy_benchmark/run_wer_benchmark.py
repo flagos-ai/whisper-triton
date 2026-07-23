@@ -16,8 +16,8 @@ from datetime import datetime
 
 warnings.filterwarnings("ignore")
 
-WHISPER_CACHE = "/data/hlgao5/whisper-cache"
-os.environ["XDG_CACHE_HOME"] = WHISPER_CACHE
+WHISPER_CACHE = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
+os.environ.setdefault("XDG_CACHE_HOME", WHISPER_CACHE)
 
 REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "../.."))
 AUDIO_PATH = os.path.join(REPO_ROOT, "tests/jfk.flac")

@@ -20,8 +20,8 @@ from datetime import datetime
 
 warnings.filterwarnings("ignore")
 
-WHISPER_CACHE = "/data/hlgao5/whisper-cache"
-os.environ["XDG_CACHE_HOME"] = WHISPER_CACHE
+WHISPER_CACHE = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
+os.environ.setdefault("XDG_CACHE_HOME", WHISPER_CACHE)
 
 AUDIO_DIR = "/tmp/whisper_perf_audio"
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "../results")
