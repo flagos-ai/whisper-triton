@@ -6,8 +6,11 @@ import torch
 try:
     import triton
     import triton.language as tl
-except ImportError:
-    raise RuntimeError("triton import failed; try `pip install --pre triton`")
+except ImportError as exc:
+    raise RuntimeError(
+        "triton import failed; install the Triton distribution supplied for "
+        "the current accelerator and PyTorch environment"
+    ) from exc
 
 
 @triton.jit

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Whisper CNPort platform test summary",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "platform",
+    "status",
+    "returncode",
+    "started_at",
+    "finished_at",
+    "pytest"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "platform": {"type": "string", "minLength": 1},
+    "status": {"enum": ["passed", "failed", "error"]},
+    "returncode": {"type": "integer"},
+    "started_at": {"type": "string"},
+    "finished_at": {"type": "string"},
+    "pytest": {
+      "type": "object",
+      "required": ["collected", "passed", "failed", "skipped", "errors"],
+      "properties": {
+        "collected": {"type": "integer", "minimum": 0},
+        "passed": {"type": "integer", "minimum": 0},
+        "failed": {"type": "integer", "minimum": 0},
+        "skipped": {"type": "integer", "minimum": 0},
+        "errors": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

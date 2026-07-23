@@ -9,3 +9,12 @@ thumbs.db
 .DS_Store
 .idea
 
+.claude/
+
+# Local test and validation artifacts may contain machine-specific paths.
+native-test/
+tests/test-result/
+tests/results/**
+!tests/results/README.md
+!tests/results/summary.schema.json
+nvidia_validation/results/
