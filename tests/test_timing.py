@@ -18,6 +18,17 @@ shapes = [
     (4, 5, 345),
     (6, 12, 240, 512),
 ]
+filter_widths = [1, 3, 5, 7, 13]
+
+
+def reflect_pad_last_dimension(x: torch.Tensor, pad_width: int):
+    if pad_width == 0:
+        return x
+
+    input_shape = x.shape
+    flattened = x.reshape(-1, input_shape[-1])
+    padded = F.pad(flattened, (pad_width, pad_width), mode="reflect")
+    return padded.reshape(*input_shape[:-1], padded.shape[-1])
 
 
 @pytest.mark.parametrize("N, M", sizes)
@@ -70,7 +81,7 @@ def test_dtw_accelerator_equivalence(N: int, M: int, accelerator_device: torch.d
 def test_median_filter(shape):
     x = torch.randn(*shape)
 
-    for filter_width in [3, 5, 7, 13]:
+    for filter_width in filter_widths:
         filtered = median_filter(x, filter_width)
 
         # use NumPy reflect padding because SciPy's edge behavior is different
@@ -81,7 +92,8 @@ def test_median_filter(shape):
         scipy_filtered = scipy.ndimage.median_filter(
             padded_x, [1] * (x.ndim - 1) + [filter_width]
         )
-        scipy_filtered = scipy_filtered[..., pad_width:-pad_width]
+        if pad_width > 0:
+            scipy_filtered = scipy_filtered[..., pad_width:-pad_width]
 
         assert np.allclose(filtered, scipy_filtered)
 
@@ -92,7 +104,7 @@ def test_median_filter(shape):
 def test_median_filter_accelerator_equivalence(shape, accelerator_device: torch.device):
     x = torch.randn(*shape)
 
-    for filter_width in [3, 5, 7, 13]:
+    for filter_width in filter_widths:
         filtered_cpu = median_filter(x, filter_width)
         filtered_accelerator = median_filter(
             x.to(accelerator_device), filter_width
@@ -103,19 +115,37 @@ def test_median_filter_accelerator_equivalence(shape, accelerator_device: torch.
 
 @pytest.mark.requires_cuda
 @pytest.mark.requires_accelerator
+@pytest.mark.parametrize("shape", shapes)
 def test_median_filter_accelerator_kernel_equivalence(
-    accelerator_device: torch.device,
+    shape, accelerator_device: torch.device
 ):
     """Call the Triton kernel directly so fallback cannot mask a failure."""
     from whisper.triton_ops import median_filter_cuda
 
-    x = torch.randn(4, 5, 345)
-    for filter_width in [3, 5, 7, 13]:
+    x = torch.randn(*shape)
+    for filter_width in filter_widths:
         expected = median_filter(x, filter_width)
         pad_width = filter_width // 2
-        padded = F.pad(x, (pad_width, pad_width, 0, 0), mode="reflect")
+        padded = reflect_pad_last_dimension(x, pad_width)
         actual = median_filter_cuda(padded.to(accelerator_device), filter_width).cpu()
         assert np.allclose(expected, actual)
+
+
+@pytest.mark.requires_cuda
+@pytest.mark.requires_accelerator
+def test_median_filter_accelerator_kernel_duplicate_values(
+    accelerator_device: torch.device,
+):
+    """Repeated values must still have a well-defined median rank."""
+    from whisper.triton_ops import median_filter_cuda
+
+    x = torch.tensor([[3.0, 1.0, 1.0, 2.0, 2.0, 2.0, 4.0, 4.0, 0.0]])
+    for filter_width in filter_widths:
+        expected = median_filter(x, filter_width)
+        pad_width = filter_width // 2
+        padded = reflect_pad_last_dimension(x, pad_width)
+        actual = median_filter_cuda(padded.to(accelerator_device), filter_width).cpu()
+        assert torch.equal(expected, actual)
 
 
 @pytest.mark.requires_cuda
