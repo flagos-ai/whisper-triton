@@ -64,9 +64,7 @@ def median_kernel(
     # avoids runtime source rewriting and also handles duplicate values.
     median = tl.load(x_ptr + offsets, mask=mask, other=0.0)
     for candidate_idx in tl.static_range(0, FILTER_WIDTH):
-        candidate = tl.load(
-            x_ptr + offsets + candidate_idx, mask=mask, other=0.0
-        )
+        candidate = tl.load(x_ptr + offsets + candidate_idx, mask=mask, other=0.0)
         num_smaller = tl.zeros((BLOCK_SIZE,), tl.int32)
         num_not_larger = tl.zeros((BLOCK_SIZE,), tl.int32)
 

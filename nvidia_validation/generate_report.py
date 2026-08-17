@@ -37,11 +37,15 @@ def render_section1(env: dict) -> str:
         for i, g in enumerate(gpu_info.get("gpus", [])):
             lines.append(f"| GPU {i} | {g.get('name')} ({g.get('memory_total')}) |")
         lines.append(f"| GPU 数量 | {gpu_info.get('count', 'N/A')} |")
-        lines.append(f"| 驱动版本 | {gpu_info.get('gpus', [{}])[0].get('driver', 'N/A')} |")
+        lines.append(
+            f"| 驱动版本 | {gpu_info.get('gpus', [{}])[0].get('driver', 'N/A')} |"
+        )
         lines.append(f"| CUDA（驱动） | {gpu_info.get('cuda_driver_version', 'N/A')} |")
     lines.append(f"| CUDA（PyTorch） | {torch_info.get('cuda_version', 'N/A')} |")
     lines.append(f"| cuDNN | {torch_info.get('cudnn_version', 'N/A')} |")
-    lines.append(f"| Triton | {triton_info.get('version', 'N/A') if triton_info.get('available') else '不可用'} |")
+    lines.append(
+        f"| Triton | {triton_info.get('version', 'N/A') if triton_info.get('available') else '不可用'} |"
+    )
     lines.append("")
 
     lines.append("### 1.2 依赖库版本\n")
@@ -61,7 +65,7 @@ def render_section1(env: dict) -> str:
 
     lines.append("### 1.4 安装与冒烟测试\n")
     smoke = env.get("smoke_test", {})
-    lines.append(f"- 安装方式：`pip install -e .`")
+    lines.append("- 安装方式：`pip install -e .`")
     lines.append(f"- 冒烟测试（tiny 模型，jfk.flac）：**{smoke.get('status', 'N/A')}**")
     lines.append(f"- 推理设备：`{smoke.get('device', 'N/A')}`")
     lines.append(f"- 转录片段：`{smoke.get('transcription_snippet', 'N/A')}`")
@@ -70,8 +74,12 @@ def render_section1(env: dict) -> str:
     lines.append("### 1.5 历史测试结果（pytest）\n")
     lines.append("| 测试套件 | 数量 | 结果 | 日志文件 |")
     lines.append("|----------|------|------|----------|")
-    lines.append("| 单元测试（audio / tokenizer / normalizer / timing） | 25/25 | **PASSED** | `tests/test-result/unit-test/unit-test-202603180926.log` |")
-    lines.append("| 集成测试（端到端转录，12 个模型） | 12/12 | **PASSED** | `tests/test-result/integration-test/integration-test-202603191115.log` |")
+    lines.append(
+        "| 单元测试（audio / tokenizer / normalizer / timing） | 25/25 | **PASSED** | `tests/test-result/unit-test/unit-test-202603180926.log` |"
+    )
+    lines.append(
+        "| 集成测试（端到端转录，12 个模型） | 12/12 | **PASSED** | `tests/test-result/integration-test/integration-test-202603191115.log` |"
+    )
     lines.append("")
 
     return "\n".join(lines)
@@ -85,11 +93,15 @@ def render_section2(acc: dict) -> str:
         lines.append("_暂无准确率测试结果。_\n")
         return "\n".join(lines)
 
-    lines.append(f"- **测试音频**：`{os.path.basename(acc.get('audio', 'jfk.flac'))}` （11 秒，英文）")
+    lines.append(
+        f"- **测试音频**：`{os.path.basename(acc.get('audio', 'jfk.flac'))}` （11 秒，英文）"
+    )
     lines.append(f"- **参考转录**：`{acc.get('ground_truth', 'N/A')}`")
-    lines.append(f"- **评估指标**：WER（字错误率）、CER（字符错误率），使用 `jiwer` 计算")
+    lines.append(
+        "- **评估指标**：WER（字错误率）、CER（字符错误率），使用 `jiwer` 计算"
+    )
     lines.append(f"- **推理设备**：`{acc.get('device', 'N/A')}`")
-    lines.append(f"- **验收标准**：|WER_本地 − WER_官方| ≤ 5%")
+    lines.append("- **验收标准**：|WER_本地 − WER_官方| ≤ 5%")
     lines.append("")
 
     results = acc.get("results", [])
@@ -99,8 +111,12 @@ def render_section2(acc: dict) -> str:
         lines.append("")
 
     lines.append("### 2.1 WER 对比表\n")
-    lines.append("| 模型 | 本地 WER (%) | 官方 WER (%) | 偏差 (%) | 本地 CER (%) | 推理耗时 (s) | 结果 |")
-    lines.append("|------|:-----------:|:------------:|:--------:|:------------:|:------------:|:----:|")
+    lines.append(
+        "| 模型 | 本地 WER (%) | 官方 WER (%) | 偏差 (%) | 本地 CER (%) | 推理耗时 (s) | 结果 |"
+    )
+    lines.append(
+        "|------|:-----------:|:------------:|:--------:|:------------:|:------------:|:----:|"
+    )
 
     all_passed = True
     for r in results:
@@ -109,8 +125,16 @@ def render_section2(acc: dict) -> str:
             all_passed = False
             continue
         status = "✅ 通过" if r.get("passed") else "❌ 不通过"
-        off_wer = f"{r['official_wer_pct']:.1f}" if r.get("official_wer_pct") is not None else "N/A"
-        dev = f"{r['wer_deviation_pct']:.1f}" if r.get("wer_deviation_pct") is not None else "N/A"
+        off_wer = (
+            f"{r['official_wer_pct']:.1f}"
+            if r.get("official_wer_pct") is not None
+            else "N/A"
+        )
+        dev = (
+            f"{r['wer_deviation_pct']:.1f}"
+            if r.get("wer_deviation_pct") is not None
+            else "N/A"
+        )
         lines.append(
             f"| {r['model']} | {r['local_wer_pct']:.1f} | {off_wer} | {dev} "
             f"| {r['local_cer_pct']:.1f} | {r['local_infer_time_s']:.2f} | {status} |"
@@ -147,8 +171,12 @@ def render_section3(perf: dict) -> str:
         return "\n".join(lines)
 
     lines.append(f"- **GPU**：{perf.get('gpu_name', 'N/A')}")
-    lines.append(f"- **指标说明**：RTF = 推理耗时 ÷ 音频时长（越小越好，< 1.0 表示可实时推理）")
-    lines.append(f"- **预热次数**：{perf.get('warmup_runs', 'N/A')} 次 | **正式测试次数**：{perf.get('bench_runs', 'N/A')} 次（取平均）")
+    lines.append(
+        "- **指标说明**：RTF = 推理耗时 ÷ 音频时长（越小越好，< 1.0 表示可实时推理）"
+    )
+    lines.append(
+        f"- **预热次数**：{perf.get('warmup_runs', 'N/A')} 次 | **正式测试次数**：{perf.get('bench_runs', 'N/A')} 次（取平均）"
+    )
     lines.append("")
 
     results = perf.get("results", [])
@@ -166,8 +194,11 @@ def render_section3(perf: dict) -> str:
     sep_dur = " | ".join([":-----------:" for _ in durations])
     lines.append(f"|------|------|{sep_dur}|:----------:|:--------------:|")
 
-    row_map = {(r["model"], r["precision"], r["audio_duration_s"]): r
-               for r in results if "error" not in r}
+    row_map = {
+        (r["model"], r["precision"], r["audio_duration_s"]): r
+        for r in results
+        if "error" not in r
+    }
 
     for model_name in models:
         for precision in ["fp32", "fp16"]:
@@ -183,12 +214,18 @@ def render_section3(perf: dict) -> str:
             throughput = f"{rep['throughput_audio_hrs_per_gpu_hr']:.2f}" if rep else "—"
             mem = f"{rep['peak_gpu_mem_mib']:.0f}" if rep else "—"
             dur_cells = " | ".join(cells)
-            lines.append(f"| {model_name} | {precision} | {dur_cells} | {throughput} | {mem} |")
+            lines.append(
+                f"| {model_name} | {precision} | {dur_cells} | {throughput} | {mem} |"
+            )
 
     lines.append("")
     lines.append("### 3.2 FP16 与 FP32 对比\n")
-    lines.append("| 模型 | 音频时长 | FP32 RTF | FP16 RTF | FP16 加速比 | 显存差值 (MiB) |")
-    lines.append("|------|:--------:|:--------:|:--------:|:-----------:|:--------------:|")
+    lines.append(
+        "| 模型 | 音频时长 | FP32 RTF | FP16 RTF | FP16 加速比 | 显存差值 (MiB) |"
+    )
+    lines.append(
+        "|------|:--------:|:--------:|:--------:|:-----------:|:--------------:|"
+    )
     for model_name in models:
         for dur in durations:
             fp32 = row_map.get((model_name, "fp32", dur))
@@ -205,15 +242,22 @@ def render_section3(perf: dict) -> str:
     lines.append("### 3.3 结论与建议\n")
 
     fp16_slower_count = sum(
-        1 for r in results
-        if r.get("precision") == "fp16" and "error" not in r
+        1
+        for r in results
+        if r.get("precision") == "fp16"
+        and "error" not in r
         and row_map.get((r["model"], "fp32", r["audio_duration_s"])) is not None
         and r["rtf"] > row_map[(r["model"], "fp32", r["audio_duration_s"])]["rtf"]
     )
-    total_fp16 = sum(1 for r in results if r.get("precision") == "fp16" and "error" not in r)
+    total_fp16 = sum(
+        1 for r in results if r.get("precision") == "fp16" and "error" not in r
+    )
 
-    over_realtime = [(r["model"], r["audio_duration_s"]) for r in results
-                     if r.get("precision") == "fp32" and "error" not in r and r["rtf"] >= 1.0]
+    over_realtime = [
+        (r["model"], r["audio_duration_s"])
+        for r in results
+        if r.get("precision") == "fp32" and "error" not in r and r["rtf"] >= 1.0
+    ]
 
     if fp16_slower_count == total_fp16:
         lines.append(
@@ -234,11 +278,15 @@ def render_section3(perf: dict) -> str:
 
     if over_realtime:
         cases = "、".join(f"{m}（{d}s）" for m, d in over_realtime)
-        lines.append(f"- **RTF ≥ 1.0（无法实时推理）**：{cases}，建议改用批量处理或降级模型。")
+        lines.append(
+            f"- **RTF ≥ 1.0（无法实时推理）**：{cases}，建议改用批量处理或降级模型。"
+        )
     else:
         lines.append("- FP32 精度下所有模型 RTF 均 < 1.0，满足实时推理要求。")
 
-    lines.append("- **推荐配置**：优先使用 FP32；仅当显存紧张（如 large-v3 处理长音频）时考虑 FP16。")
+    lines.append(
+        "- **推荐配置**：优先使用 FP32；仅当显存紧张（如 large-v3 处理长音频）时考虑 FP16。"
+    )
     lines.append("")
 
     return "\n".join(lines)
@@ -249,8 +297,12 @@ def render_section4() -> str:
     lines.append("## 第四部分 — 问题记录与解决方案\n")
     lines.append("| 编号 | 问题描述 | 严重程度 | 解决方案 |")
     lines.append("|------|----------|----------|----------|")
-    lines.append("| 1 | `torch.load` 使用 `weights_only=False` 触发 `FutureWarning` | 低 | 在 `whisper/__init__.py:146` 改为 `weights_only=True`，并通过 `torch.serialization.add_safe_globals()` 注册 Whisper checkpoint 类 |")
-    lines.append("| 2 | 模型缓存不在默认路径 `~/.cache/whisper` | 低 | 设置环境变量 `XDG_CACHE_HOME` 或向 `whisper.load_model()` 传入显式 `download_root` 参数 |")
+    lines.append(
+        "| 1 | `torch.load` 使用 `weights_only=False` 触发 `FutureWarning` | 低 | 在 `whisper/__init__.py:146` 改为 `weights_only=True`，并通过 `torch.serialization.add_safe_globals()` 注册 Whisper checkpoint 类 |"
+    )
+    lines.append(
+        "| 2 | 模型缓存不在默认路径 `~/.cache/whisper` | 低 | 设置环境变量 `XDG_CACHE_HOME` 或向 `whisper.load_model()` 传入显式 `download_root` 参数 |"
+    )
     lines.append("")
     return "\n".join(lines)
 
@@ -265,14 +317,16 @@ def main():
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     whisper_ver = env.get("whisper", {}).get("version", "N/A")
-    gpu_name = env.get("gpu", {}).get("gpus", [{}])[0].get("name", "N/A") if env else "N/A"
+    gpu_name = (
+        env.get("gpu", {}).get("gpus", [{}])[0].get("name", "N/A") if env else "N/A"
+    )
 
     lines = []
     lines.append("# Whisper NVIDIA 平台验证报告")
     lines.append(f"\n**生成日期**：{now}  ")
     lines.append(f"**Whisper 版本**：{whisper_ver}  ")
     lines.append(f"**GPU**：{gpu_name}  ")
-    lines.append(f"**代码分支**：patches/base（上游镜像）\n")
+    lines.append("**代码分支**：patches/base（上游镜像）\n")
     lines.append("---\n")
 
     lines.append(render_section1(env))

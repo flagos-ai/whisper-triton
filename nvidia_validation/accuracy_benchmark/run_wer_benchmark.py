@@ -33,6 +33,7 @@ OFFICIAL_WHISPER_DIR = "/tmp/official_whisper"
 
 def compute_wer(reference: str, hypothesis: str) -> float:
     from jiwer import wer
+
     ref = reference.strip().lower()
     hyp = hypothesis.strip().lower()
     return round(wer(ref, hyp) * 100, 2)
@@ -40,6 +41,7 @@ def compute_wer(reference: str, hypothesis: str) -> float:
 
 def compute_cer(reference: str, hypothesis: str) -> float:
     from jiwer import cer
+
     ref = reference.strip().lower()
     hyp = hypothesis.strip().lower()
     return round(cer(ref, hyp) * 100, 2)
@@ -48,6 +50,7 @@ def compute_cer(reference: str, hypothesis: str) -> float:
 def load_local_whisper():
     """Load whisper from the local repo (installed via pip install -e .)."""
     import whisper
+
     return whisper
 
 
@@ -59,23 +62,27 @@ def load_official_whisper():
         sys.path.insert(0, OFFICIAL_WHISPER_DIR)
     try:
         # Reload to get official version
-        import importlib
         if "whisper" in sys.modules:
             # Try to get official by checking version
             pass
         import whisper as official
+
         return official, None
     except ImportError as e:
         return None, str(e)
 
 
-def transcribe_with_module(whisper_module, model_name: str, audio_path: str, device: str) -> dict:
+def transcribe_with_module(
+    whisper_module, model_name: str, audio_path: str, device: str
+) -> dict:
     t0 = time.perf_counter()
     model = whisper_module.load_model(model_name, device=device)
     load_time = time.perf_counter() - t0
 
     t1 = time.perf_counter()
-    result = whisper_module.transcribe(model, audio_path, language="en", temperature=0.0)
+    result = whisper_module.transcribe(
+        model, audio_path, language="en", temperature=0.0
+    )
     infer_time = time.perf_counter() - t1
 
     return {
@@ -87,11 +94,11 @@ def transcribe_with_module(whisper_module, model_name: str, audio_path: str, dev
 
 
 def run_benchmark(models: list, device: str) -> dict:
-    import torch
-
     print(f"\nDevice: {device}")
     print(f"Ground truth: {GROUND_TRUTH}\n")
-    print(f"{'Model':<14} {'WER(%)':>8} {'CER(%)':>8} {'Infer(s)':>10}  {'Transcription (first 70 chars)'}")
+    print(
+        f"{'Model':<14} {'WER(%)':>8} {'CER(%)':>8} {'Infer(s)':>10}  {'Transcription (first 70 chars)'}"
+    )
     print("-" * 100)
 
     local_whisper = load_local_whisper()
@@ -101,9 +108,7 @@ def run_benchmark(models: list, device: str) -> dict:
     local_same_as_official = False
     if official_whisper is not None:
         try:
-            local_same_as_official = (
-                local_whisper.__file__ == official_whisper.__file__
-            )
+            local_same_as_official = local_whisper.__file__ == official_whisper.__file__
         except Exception:
             pass
 
@@ -111,7 +116,9 @@ def run_benchmark(models: list, device: str) -> dict:
     for model_name in models:
         print(f"\n  [{model_name}] loading...", end="", flush=True)
         try:
-            local_out = transcribe_with_module(local_whisper, model_name, AUDIO_PATH, device)
+            local_out = transcribe_with_module(
+                local_whisper, model_name, AUDIO_PATH, device
+            )
             local_wer = compute_wer(GROUND_TRUTH, local_out["text"])
             local_cer = compute_cer(GROUND_TRUTH, local_out["text"])
 
@@ -130,32 +137,40 @@ def run_benchmark(models: list, device: str) -> dict:
 
             if official_whisper is not None and not local_same_as_official:
                 try:
-                    off_out = transcribe_with_module(official_whisper, model_name, AUDIO_PATH, device)
+                    off_out = transcribe_with_module(
+                        official_whisper, model_name, AUDIO_PATH, device
+                    )
                     off_wer = compute_wer(GROUND_TRUTH, off_out["text"])
                     deviation = round(abs(local_wer - off_wer), 2)
-                    row.update({
-                        "official_text": off_out["text"],
-                        "official_wer_pct": off_wer,
-                        "wer_deviation_pct": deviation,
-                        "passed": deviation <= 5.0,
-                    })
+                    row.update(
+                        {
+                            "official_text": off_out["text"],
+                            "official_wer_pct": off_wer,
+                            "wer_deviation_pct": deviation,
+                            "passed": deviation <= 5.0,
+                        }
+                    )
                 except Exception as e:
                     row["note"] = f"official inference error: {e}"
             else:
                 # Local IS official (same codebase) — deviation = 0 by definition
-                row.update({
-                    "official_text": local_out["text"],
-                    "official_wer_pct": local_wer,
-                    "wer_deviation_pct": 0.0,
-                    "passed": True,
-                    "note": "local repo is exact mirror of upstream; deviation = 0",
-                })
+                row.update(
+                    {
+                        "official_text": local_out["text"],
+                        "official_wer_pct": local_wer,
+                        "wer_deviation_pct": 0.0,
+                        "passed": True,
+                        "note": "local repo is exact mirror of upstream; deviation = 0",
+                    }
+                )
 
             results.append(row)
             status = "PASS" if row["passed"] else "FAIL"
-            print(f"\r  [{model_name:<12}]  WER={local_wer:5.1f}%  CER={local_cer:5.1f}%"
-                  f"  infer={local_out['infer_time_s']:6.2f}s  [{status}]"
-                  f"  dev={row['wer_deviation_pct']:.1f}%  | {local_out['text'][:60]!r}")
+            print(
+                f"\r  [{model_name:<12}]  WER={local_wer:5.1f}%  CER={local_cer:5.1f}%"
+                f"  infer={local_out['infer_time_s']:6.2f}s  [{status}]"
+                f"  dev={row['wer_deviation_pct']:.1f}%  | {local_out['text'][:60]!r}"
+            )
 
         except Exception as e:
             print(f"\r  [{model_name:<12}]  ERROR: {e}")
@@ -177,7 +192,9 @@ def print_summary(data: dict):
     print("\n" + "=" * 100)
     print("ACCURACY BENCHMARK SUMMARY")
     print("=" * 100)
-    print(f"{'Model':<14} {'Local WER%':>10} {'Official WER%':>14} {'Deviation%':>11} {'Status':>8}")
+    print(
+        f"{'Model':<14} {'Local WER%':>10} {'Official WER%':>14} {'Deviation%':>11} {'Status':>8}"
+    )
     print("-" * 100)
     all_passed = True
     for r in results:
@@ -186,22 +203,39 @@ def print_summary(data: dict):
             all_passed = False
             continue
         status = "PASS" if r.get("passed") else "FAIL"
-        off_wer = f"{r['official_wer_pct']:.1f}%" if r["official_wer_pct"] is not None else "N/A"
-        dev = f"{r['wer_deviation_pct']:.1f}%" if r["wer_deviation_pct"] is not None else "N/A"
-        print(f"  {r['model']:<12}  {r['local_wer_pct']:>8.1f}%  {off_wer:>13}  {dev:>10}  {status:>7}")
+        off_wer = (
+            f"{r['official_wer_pct']:.1f}%"
+            if r["official_wer_pct"] is not None
+            else "N/A"
+        )
+        dev = (
+            f"{r['wer_deviation_pct']:.1f}%"
+            if r["wer_deviation_pct"] is not None
+            else "N/A"
+        )
+        print(
+            f"  {r['model']:<12}  {r['local_wer_pct']:>8.1f}%  {off_wer:>13}  {dev:>10}  {status:>7}"
+        )
         if not r.get("passed"):
             all_passed = False
     print("-" * 100)
-    print(f"Overall: {'ALL PASSED' if all_passed else 'SOME FAILED'} (threshold: deviation ≤ 5%)\n")
+    print(
+        f"Overall: {'ALL PASSED' if all_passed else 'SOME FAILED'} (threshold: deviation ≤ 5%)\n"
+    )
 
 
 def main():
     parser = argparse.ArgumentParser(description="Whisper WER accuracy benchmark")
-    parser.add_argument("--models", nargs="+", default=DEFAULT_MODELS, help="Models to benchmark")
-    parser.add_argument("--device", default=None, help="cuda or cpu (auto-detect if not set)")
+    parser.add_argument(
+        "--models", nargs="+", default=DEFAULT_MODELS, help="Models to benchmark"
+    )
+    parser.add_argument(
+        "--device", default=None, help="cuda or cpu (auto-detect if not set)"
+    )
     args = parser.parse_args()
 
     import torch
+
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
 
     print("=" * 100)
