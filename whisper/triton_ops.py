@@ -1,6 +1,3 @@
-from functools import lru_cache
-
-import numpy as np
 import torch
 
 try:
@@ -43,78 +40,60 @@ def dtw_kernel(
         tl.store(trace_ptr + offsets, 0, mask=mask & (c0 <= c1) & (c0 <= c2))
 
 
-@lru_cache(maxsize=None)
-def median_kernel(filter_width: int):
-    @triton.jit
-    def kernel(
-        y, x, x_stride, y_stride, BLOCK_SIZE: tl.constexpr
-    ):  # x.shape[-1] == filter_width
-        row_idx = tl.program_id(0)
-        offsets = tl.arange(0, BLOCK_SIZE)
-        mask = offsets < y_stride
+@triton.jit
+def median_kernel(
+    y,
+    x,
+    x_stride,
+    y_stride,
+    FILTER_WIDTH: tl.constexpr,
+    BLOCK_SIZE: tl.constexpr,
+):
+    """Compute a sliding-window median along the last tensor dimension."""
+    row_idx = tl.program_id(0)
+    offsets = tl.arange(0, BLOCK_SIZE)
+    mask = offsets < y_stride
 
-        x_ptr = x + row_idx * x_stride  # noqa: F841
-        y_ptr = y + row_idx * y_stride
+    x_ptr = x + row_idx * x_stride
+    y_ptr = y + row_idx * y_stride
+    middle = FILTER_WIDTH // 2
 
-        LOAD_ALL_ROWS_HERE  # noqa: F821
+    # FILTER_WIDTH is a compile-time constant, so both loops are fully unrolled.
+    # A value is the median when no more than `middle` values are smaller than it
+    # and more than `middle` values are less than or equal to it.  Using ranks
+    # avoids runtime source rewriting and also handles duplicate values.
+    median = tl.load(x_ptr + offsets, mask=mask, other=0.0)
+    for candidate_idx in tl.static_range(0, FILTER_WIDTH):
+        candidate = tl.load(x_ptr + offsets + candidate_idx, mask=mask, other=0.0)
+        num_smaller = tl.zeros((BLOCK_SIZE,), tl.int32)
+        num_not_larger = tl.zeros((BLOCK_SIZE,), tl.int32)
 
-        BUBBLESORT_HERE  # noqa: F821
+        for value_idx in tl.static_range(0, FILTER_WIDTH):
+            value = tl.load(x_ptr + offsets + value_idx, mask=mask, other=0.0)
+            num_smaller += tl.where(value < candidate, 1, 0)
+            num_not_larger += tl.where(value <= candidate, 1, 0)
 
-        tl.store(y_ptr + offsets, MIDDLE_ROW_HERE, mask=mask)  # noqa: F821
+        is_median = (num_smaller <= middle) & (num_not_larger > middle)
+        median = tl.where(is_median, candidate, median)
 
-    kernel = triton.JITFunction(kernel.fn)
-    new_kernel = kernel.src.replace(
-        "    LOAD_ALL_ROWS_HERE",
-        "\n".join(
-            [
-                f"    row{i} = tl.load(x_ptr + offsets + {i}, mask=mask)"
-                for i in range(filter_width)
-            ]
-        ),
-    )
-
-    new_kernel = new_kernel.replace(
-        "    BUBBLESORT_HERE",
-        "\n\n".join(
-            [
-                "\n\n".join(
-                    [
-                        "\n".join(
-                            [
-                                f"    smaller = tl.where(row{j} < row{j + 1}, row{j}, row{j + 1})",
-                                f"    larger = tl.where(row{j} > row{j + 1}, row{j}, row{j + 1})",
-                                f"    row{j} = smaller",
-                                f"    row{j + 1} = larger",
-                            ]
-                        )
-                        for j in range(filter_width - i - 1)
-                    ]
-                )
-                for i in range(filter_width // 2 + 1)
-            ]
-        ),
-    )
-
-    new_kernel = new_kernel.replace("MIDDLE_ROW_HERE", f"row{filter_width // 2}")
-
-    if hasattr(kernel, "_unsafe_update_src") is True:
-        kernel._unsafe_update_src(new_kernel)
-        kernel.hash = None
-    else:
-        kernel.src = new_kernel
-
-    return kernel
+    tl.store(y_ptr + offsets, median, mask=mask)
 
 
 def median_filter_cuda(x: torch.Tensor, filter_width: int):
     """Apply a median filter of given width along the last dimension of x"""
-    slices = x.contiguous().unfold(-1, filter_width, 1)
-    grid = np.prod(slices.shape[:-2])
+    x = x.contiguous()
+    output_width = x.shape[-1] - filter_width + 1
+    row_count = x.numel() // x.shape[-1]
+    y = torch.empty((*x.shape[:-1], output_width), dtype=x.dtype, device=x.device)
 
-    kernel = median_kernel(filter_width)
-    y = torch.empty_like(slices[..., 0])
-
-    BLOCK_SIZE = 1 << (y.stride(-2) - 1).bit_length()
-    kernel[(grid,)](y, x, x.stride(-2), y.stride(-2), BLOCK_SIZE=BLOCK_SIZE)
+    BLOCK_SIZE = 1 << (output_width - 1).bit_length()
+    median_kernel[(row_count,)](
+        y,
+        x,
+        x.shape[-1],
+        output_width,
+        FILTER_WIDTH=filter_width,
+        BLOCK_SIZE=BLOCK_SIZE,
+    )
 
     return y

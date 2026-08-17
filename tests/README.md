@@ -83,9 +83,10 @@ DTW（动态时间规整）是词级时间戳（word timestamps）功能的核�
 |---------|--------|---------|
 | `test_dtw` | 无 | CPU DTW 正确性：构造已知最优路径的矩阵，验证返回路径与预期一致，覆盖 4 种矩阵尺寸 |
 | `test_dtw_accelerator_equivalence` | `requires_accelerator` | 加速器 Triton DTW 与 CPU DTW 在 4 种矩阵尺寸下结果一致 |
-| `test_median_filter` | 无 | CPU median filter 正确性：与 scipy 参考实现对比，覆盖 4 种 tensor 形状 × 4 种窗宽 |
+| `test_median_filter` | 无 | CPU median filter 正确性：与 scipy 参考实现对比，覆盖 4 种 tensor 形状 × 5 种窗宽 |
 | `test_median_filter_accelerator_equivalence` | `requires_accelerator` | 加速器 median filter 与 CPU 结果一致 |
-| `test_median_filter_accelerator_kernel_equivalence` | `requires_accelerator` | 直接启动 Triton median kernel，避免 CPU fallback 掩盖失败 |
+| `test_median_filter_accelerator_kernel_equivalence` | `requires_accelerator` | 对多维输入和全部窗宽直接启动 Triton median kernel，避免 CPU fallback 掩盖失败 |
+| `test_median_filter_accelerator_kernel_duplicate_values` | `requires_accelerator` | 验证 Triton kernel 对重复值的中位数秩判定 |
 | `test_timing_falls_back_to_cpu` | `requires_accelerator` | 模拟 Triton 编译失败，验证两个 timing 算法回退到 CPU |
 
 ---
