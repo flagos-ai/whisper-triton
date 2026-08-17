@@ -18,7 +18,7 @@ Whisper CNPort 基于 [OpenAI Whisper](https://github.com/openai/whisper)，目�
 |---|---|---|---|
 | NVIDIA | `cuda` | NVIDIA / cubin | PyTorch CUDA + PyPI/配套 Triton |
 | 华为昇腾 | `npu` | Ascend / npubin | `torch_npu` + 昇腾 Triton |
-| 寒武纪 | `mlu` | MLU / cnbin | **部分支持/验证中**：DTW kernel 可在 MLU 执行；median kernel 失败时自动回退 CPU |
+| 寒武纪 | `mlu` | MLU / cnbin | **部分支持/验证中**：DTW 与 median kernel 的 MLU 直连等价测试通过；全模型 MLU 转录待验收 |
 | 摩尔线程 | `musa` | MTGPU / mubin | `torch_musa` + MUSA Triton |
 | 海光 | `cuda` 或 HIP 兼容设备 | AMD/HIP / hsaco | 厂商 PyTorch + 配套 ROCm/HIP Triton |
 | 阿里平头哥 | CUDA 兼容设备 | 平台工具链产物 | PPU SDK、厂商 PyTorch 和配套 Triton |
@@ -27,7 +27,7 @@ Whisper CNPort 基于 [OpenAI Whisper](https://github.com/openai/whisper)，目�
 
 ### 寒武纪 MLU590 当前限制
 
-2026-07-23 在 MLU590-M9、Python 3.10.12、Torch 2.9.1、
+旧版动态 kernel 于 2026-07-23 在 MLU590-M9、Python 3.10.12、Torch 2.9.1、
 `torch_mlu 1.30.2+torch2.9.1`、MLU Triton 3.2.0 组合上的实测结果为
 `40 passed, 1 failed`：
 
@@ -42,10 +42,15 @@ Whisper CNPort 基于 [OpenAI Whisper](https://github.com/openai/whisper)，目�
   `torch.cuda.is_available()` 为真时选择加速器，本次实际在 CPU 执行。因此该结果不能
   作为 MLU Encoder/Decoder 全模型推理已验收的证据。
 
-基于上述结果，本仓库目前不宣称寒武纪平台已完成全栈移植。可支持的范围是：上游
-Python API、CPU 推理、MLU 张量上的 DTW Triton 路径，以及 median kernel 失败后的
-CPU 功能回退。发布“完整支持”前仍需修复或升级 MLU Triton 的动态 kernel 编译问题，
-并让全模型转录测试显式在 `mlu` 设备执行通过。
+当前开发分支已将 `median_kernel` 重写为普通的静态 Triton JIT kernel，窗宽通过
+`tl.constexpr` 特化，不再修改 `JITFunction` 源码。2026-08-17 在相同 MLU590-M9
+环境重新执行 `tests/test_timing.py`，22 个用例全部通过，覆盖 DTW 与 median kernel
+直连、CPU 等价性、多维输入、5 种窗宽和重复值中位数判定。这解决了上述动态 kernel
+编译/序列化问题。
+
+本仓库目前仍不宣称寒武纪平台已完成全栈移植。当前可支持的范围是：上游 Python
+API、CPU 推理，以及 MLU 张量上的 DTW 和 median Triton 路径。发布“完整支持”前仍需
+让全模型转录测试显式在 `mlu` 设备执行通过。
 
 ## 安装
 
