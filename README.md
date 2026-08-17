@@ -44,8 +44,13 @@ Whisper CNPort 基于 [OpenAI Whisper](https://github.com/openai/whisper)，目�
 
 基于上述结果，本仓库目前不宣称寒武纪平台已完成全栈移植。可支持的范围是：上游
 Python API、CPU 推理、MLU 张量上的 DTW Triton 路径，以及 median kernel 失败后的
-CPU 功能回退。发布“完整支持”前仍需修复或升级 MLU Triton 的动态 kernel 编译问题，
-并让全模型转录测试显式在 `mlu` 设备执行通过。
+CPU 功能回退。发布“完整支持”前仍需让重写后的 kernel 与全模型转录测试显式在
+`mlu` 设备执行通过。
+
+当前开发分支已将 `median_kernel` 重写为普通的静态 Triton JIT kernel，窗宽通过
+`tl.constexpr` 特化，不再修改 `JITFunction` 源码。上面的结果仍是最近一次已完成的
+MLU 实机验证基线；在 MLU590 上重新完成 kernel 直连和端到端验收前，支持状态暂不
+提前调整。
 
 ## 安装
 
