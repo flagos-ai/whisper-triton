@@ -16,7 +16,9 @@ os.environ.setdefault("XDG_CACHE_HOME", WHISPER_CACHE)
 
 def run_cmd(cmd):
     try:
-        return subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL, text=True).strip()
+        return subprocess.check_output(
+            cmd, shell=True, stderr=subprocess.DEVNULL, text=True
+        ).strip()
     except Exception:
         return "N/A"
 
@@ -31,26 +33,40 @@ def check_system():
 
 
 def check_gpu():
-    smi = run_cmd("nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv,noheader")
+    smi = run_cmd(
+        "nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv,noheader"
+    )
     if smi == "N/A":
         return {"available": False}
     gpus = []
     for line in smi.strip().split("\n"):
         parts = [p.strip() for p in line.split(",")]
         if len(parts) >= 4:
-            gpus.append({
-                "name": parts[0],
-                "driver": parts[1],
-                "memory_total": parts[2],
-                "compute_capability": parts[3],
-            })
-    cuda_ver = run_cmd("nvidia-smi --query-gpu=cuda_version --format=csv,noheader").split("\n")[0].strip()
-    return {"available": True, "count": len(gpus), "cuda_driver_version": cuda_ver, "gpus": gpus}
+            gpus.append(
+                {
+                    "name": parts[0],
+                    "driver": parts[1],
+                    "memory_total": parts[2],
+                    "compute_capability": parts[3],
+                }
+            )
+    cuda_ver = (
+        run_cmd("nvidia-smi --query-gpu=cuda_version --format=csv,noheader")
+        .split("\n")[0]
+        .strip()
+    )
+    return {
+        "available": True,
+        "count": len(gpus),
+        "cuda_driver_version": cuda_ver,
+        "gpus": gpus,
+    }
 
 
 def check_torch():
     try:
         import torch
+
         cuda_available = torch.cuda.is_available()
         info = {
             "version": torch.__version__,
@@ -69,6 +85,7 @@ def check_torch():
 def check_triton():
     try:
         import triton
+
         return {"version": triton.__version__, "available": True}
     except ImportError:
         return {"available": False}
@@ -77,12 +94,17 @@ def check_triton():
 def check_whisper():
     try:
         import whisper
+
         models_in_cache = []
         cache_dir = os.path.join(WHISPER_CACHE, "whisper")
         if os.path.isdir(cache_dir):
-            models_in_cache = [f.replace(".pt", "") for f in os.listdir(cache_dir) if f.endswith(".pt")]
+            models_in_cache = [
+                f.replace(".pt", "") for f in os.listdir(cache_dir) if f.endswith(".pt")
+            ]
         return {
-            "version": whisper.__version__ if hasattr(whisper, "__version__") else "N/A",
+            "version": (
+                whisper.__version__ if hasattr(whisper, "__version__") else "N/A"
+            ),
             "available_models": whisper.available_models(),
             "cached_models": sorted(models_in_cache),
             "cache_dir": cache_dir,
@@ -92,10 +114,22 @@ def check_whisper():
 
 
 def check_packages():
-    pkgs = ["torch", "triton", "tiktoken", "numba", "numpy", "scipy", "torchaudio", "jiwer", "soundfile"]
+    pkgs = [
+        "torch",
+        "triton",
+        "tiktoken",
+        "numba",
+        "numpy",
+        "scipy",
+        "torchaudio",
+        "jiwer",
+        "soundfile",
+    ]
     result = {}
     for pkg in pkgs:
-        ver = run_cmd(f"pip show {pkg} 2>/dev/null | grep ^Version | awk '{{print $2}}'")
+        ver = run_cmd(
+            f"pip show {pkg} 2>/dev/null | grep ^Version | awk '{{print $2}}'"
+        )
         result[pkg] = ver if ver else "not installed"
     return result
 
@@ -104,7 +138,9 @@ def check_whisper_inference():
     """Quick inference smoke test with tiny model."""
     try:
         import torch
+
         import whisper
+
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model = whisper.load_model("tiny", device=device)
         audio_path = os.path.join(os.path.dirname(__file__), "../../tests/jfk.flac")
