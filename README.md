@@ -52,27 +52,6 @@ CPU 功能回退。发布“完整支持”前仍需让重写后的 kernel 与�
 MLU 实机验证基线；在 MLU590 上重新完成 kernel 直连和端到端验收前，支持状态暂不
 提前调整。
 
-### 摩尔线程 S5000 当前限制
-
-2026-09-21 在 8 卡 S5000、Python 3.10.12、Torch 2.7.1、
-`torch_musa 2.7.0+8ae54fa`、MUSA Triton 3.1.0（镜像
-`triton-mtt-s5000-py310:v1.0.0-amd64`，digest
-`sha256:6c5f881f6213e427f088e168d9040781801a032a63b296d4a15e9bd8b300a74d`）上的实测结果：
-
-- `dtw_kernel` 和 `median_kernel` 均可在 musa 设备编译、直连执行，加速器等价性
-  测试（含全部窗宽 1/3/5/7/13、多维形状和重复值用例）全部通过，未触发 CPU 回退。
-- 上游 pytest 全量 45/45 通过。但 `test_transcribe.py` 按 `torch.cuda.is_available()`
-  选择设备，`torch_musa` 不注册 `torch.cuda`，因此该轮 pytest 的 14 个模型转录
-  实际在 CPU 执行（日志含 “FP16 is not supported on CPU” 警告）。
-- 另行显式指定 `musa` 设备执行了全部 14 个模型的端到端转录，语种识别和关键短语
-  断言全部通过，单模型推理耗时 0.3-1.3 秒。
-- 限制：在 musa 设备上 `word_timestamps=True` 会在 `whisper/timing.py` 的
-  `torch.std_mean` 处抛出 `NotImplementedError`，原因是 `torch_musa 2.7.0` 尚未实现
-  `aten::std_mean.correction` 算子。这是 torch_musa 的算子覆盖问题，不是 Triton
-  kernel 的问题（两个 timing kernel 本身已通过 musa 设备直连等价性验证）。
-  规避方式：词级时间戳相关计算前将张量移到 CPU，或等待 torch_musa 后续版本补齐
-  该算子。
-
 ## 安装
 
 不要在多个厂商平台之间复用同一个 Python 环境。建议每个平台使用独立 venv 或容器，并使用同一个 Python 解释器完成安装和测试。
@@ -236,7 +215,7 @@ python scripts/run_platform_tests.py --platform <platform-key>
 | 华为昇腾 910B | `triton-ascend-910b-py310:v1.0.0-arm64`（digest `sha256:b5e5c7757b23`） | `2.5.1` + `torch_npu 2.5.1` / `3.2.0` | ✅ 22/22（2026-09-21） | ✅ 31/31（2026-09-21） | ✅ 32/32，含 `tiny.en` 1/1（2026-09-21） | ✅ 45/45，含全模型 14/14（2026-09-21） | Triton 改写与全量移植已验证 |
 | 海光 BW1000 | `triton-hygon-bw1000-py310:v1.0.0-amd64`（digest `sha256:189ff4891b41`） | `2.5.1`（HIP）/ `3.0.0` | ✅ 22/22（2026-09-21） | ✅ 31/31（2026-09-21） | ✅ 32/32，含 `tiny.en` 1/1（2026-09-21） | ✅ 45/45，含全模型 14/14（2026-09-21） | Triton 改写与全量移植已验证 |
 | 寒武纪 MLU590 | `triton-cambricon-mlu590-py310:v1.0.0-amd64` | `2.9.1` + `torch_mlu` / `3.2.0` | ⚠️ DTW 通过；median 编译失败（2026-07-22） | ✅ 27/27（2026-07-22，包含在全量执行中） | — | ⚠️ 40/41；唯一失败为 median 直连用例，功能回退通过 | 部分完成，median 未通过直连 |
-| 摩尔线程 S5000 | `triton-mtt-s5000-py310:v1.0.0-amd64`（digest `sha256:6c5f881f6213`） | `2.7.1` + `torch_musa 2.7.0` / `3.1.0` | ✅ 22/22（2026-09-21） | ✅ 31/31（2026-09-21，包含在全量执行中） | ✅ 32/32，含 `tiny.en` 1/1（2026-09-21，包含在全量执行中） | ✅ 45/45，含全模型 14/14（2026-09-21） | Triton 改写已实机复验；全模型已在 musa 设备验证（不含词级时间戳），详见下方限制说明 |
+| 摩尔线程 S5000 | `triton-mtt-s5000-py310:v1.0.0-amd64`（digest `sha256:6c5f881f6213`） | `2.7.1` + `torch_musa 2.7.0` / `3.1.0` | ✅ 22/22（2026-09-21） | ✅ 31/31（2026-09-21，包含在全量执行中） | ✅ 32/32，含 `tiny.en` 1/1（2026-09-21，包含在全量执行中） | ✅ 45/45，含全模型 14/14（2026-09-21） | Triton 改写与全量移植已验证 |
 | 阿里平头哥 PPU-ZW810E | `triton-t-head-zw810e-py310:v1.0.0-amd64` | `2.6.0` / `3.2.0` | ✅ DTW、median 通过（2026-07-22） | ✅ 27/27（2026-07-22） | ✅ 28/28，含 `tiny.en` 1/1（2026-07-22） | — | Triton 改写与端到端冒烟已验证 |
 
 层级结果说明：
@@ -251,7 +230,7 @@ python scripts/run_platform_tests.py --platform <platform-key>
 - 华为昇腾 910B3 已于 2026-09-21 使用 `triton-ascend-910b-py310:v1.0.0-arm64`（digest `sha256:b5e5c7757b23e729eb78781fd805a74888461668fc5cec5b5cf027be6818e729`）实机复验：`timing-kernel-probe` 22/22（DTW 与 median kernel 均在 `npu` 设备直连执行并通过 CPU 等价性检查），`unit` 31/31，`unit+smoke` 32/32（含 `tiny.en` 端到端冒烟），`full-integration` 全量 45/45 通过。执行环境为镜像内置的 CANN 8.5.0、Torch 2.5.1、`torch_npu 2.5.1`、Triton 3.2.0（backend `npu`）；本机 VPC 仓库域名不可解析，实际通过公网仓库地址使用本地已拉取的同 tag 镜像。上游 `test_transcribe` 用例仅在 `torch.cuda.is_available()` 为真时选择加速器，本次 14 个模型转录均在 CPU 执行，该结果不能作为 NPU Encoder/Decoder 全模型推理已验收的证据；NPU 上已验证的部分为 `timing` 两个 Triton kernel 的直连执行。
 - 海光 BW1000 四个层级已于 2026-09-21 使用 `triton-hygon-bw1000-py310:v1.0.0-amd64`（digest `sha256:189ff4891b413b44484af90d0d27795e0a2a2b09e583b4172a42245588724abc`，torch `2.5.1` HIP `6.3.26045`、Triton `3.0.0`、设备 `BW200, UBB BW1000`×8）实机复验，四个层级全部通过：`timing-kernel-probe` 22/22、`unit` 31/31、`unit+smoke` 32/32（含 `tiny.en`）、`full-integration` 45/45（含全部 14 个模型名/别名）。
 - 海光镜像的 ROCm 版 PyTorch 未内置 SDPA GPU kernel（缺少 `flash_attn_2_cuda*.so`，Aotriton flash attention 编译期禁用），fp16 张量调用 `scaled_dot_product_attention` 会直接抛 `RuntimeError` 而不是回退。本次复验在 `whisper/model.py` 中为 SDPA 增加了异常回退：首次调用失败后自动切换到等价的手动 attention 路径并关闭 SDPA，对数值结果无影响。该改动同样惠及其他 SDPA kernel 不完整的平台。
-- 摩尔线程 S5000 四个层级已于 2026-09-21 使用 `triton-mtt-s5000-py310:v1.0.0-amd64`（digest `sha256:6c5f881f6213e427f088e168d9040781801a032a63b296d4a15e9bd8b300a74d`）在 8 卡 S5000 实机复验，`full-integration` 全量结果为 45/45 通过，结果产物存于 `tests/results/musa/20260921063732/`。两点限制见下条与“摩尔线程 S5000 当前限制”。
+- 摩尔线程 S5000 四个层级已于 2026-09-21 使用 `triton-mtt-s5000-py310:v1.0.0-amd64`（digest `sha256:6c5f881f6213e427f088e168d9040781801a032a63b296d4a15e9bd8b300a74d`）在 8 卡 S5000 实机复验，`full-integration` 全量结果为 45/45 通过，结果产物存于 `tests/results/musa/20260921063732/`。
 - 寒武纪 MLU590 的 40 个通过用例包含 median fallback 功能正确性，但不能证明 median kernel 已在 MLU 设备执行。
 - 除 NVIDIA A40、华为昇腾 910B、海光 BW1000 和摩尔线程 S5000 外，其余平台行仍为历史实机结果且未记录镜像 digest；本机没有对应国产平台硬件，尚未完成镜像复验。正式发布前应使用上表镜像重跑全部四个层级，并在 `tests/results/` 的脱敏摘要中记录镜像地址、tag/digest 和测试 commit。
 
