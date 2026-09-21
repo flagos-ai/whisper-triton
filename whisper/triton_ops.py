@@ -79,6 +79,48 @@ def median_kernel(
     tl.store(y_ptr + offsets, median, mask=mask)
 
 
+@triton.jit
+def std_mean_kernel(std, mean, x, x_stride, M, BLOCK_SIZE: tl.constexpr):
+    """Compute the biased standard deviation and mean of the last dimension."""
+    row_idx = tl.program_id(0)
+    offsets = tl.arange(0, BLOCK_SIZE)
+    mask = offsets < M
+
+    x_ptr = x + row_idx * x_stride
+    values = tl.load(x_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
+    mean_val = tl.sum(values, axis=0) / M
+    centered = tl.where(mask, values - mean_val, 0.0)
+    var_val = tl.sum(centered * centered, axis=0) / M
+
+    tl.store(std + row_idx, tl.sqrt(var_val).to(std.dtype.element_ty))
+    tl.store(mean + row_idx, mean_val.to(mean.dtype.element_ty))
+
+
+def std_mean_cuda(x: torch.Tensor):
+    """Compute the biased std and mean along dim=-2 of x, keeping the dimension
+
+    Equivalent to ``torch.std_mean(x, dim=-2, keepdim=True, unbiased=False)``,
+    which some vendor PyTorch builds do not implement.
+    """
+    x = x.transpose(-1, -2).contiguous()
+    row_count = x.numel() // x.shape[-1]
+    M = x.shape[-1]
+    std = x.new_empty((*x.shape[:-1], 1))
+    mean = x.new_empty((*x.shape[:-1], 1))
+
+    BLOCK_SIZE = 1 << (M - 1).bit_length()
+    std_mean_kernel[(row_count,)](
+        std,
+        mean,
+        x,
+        x.shape[-1],
+        M,
+        BLOCK_SIZE=BLOCK_SIZE,
+    )
+
+    return std.transpose(-1, -2), mean.transpose(-1, -2)
+
+
 def median_filter_cuda(x: torch.Tensor, filter_width: int):
     """Apply a median filter of given width along the last dimension of x"""
     x = x.contiguous()
