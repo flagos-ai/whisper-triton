@@ -97,21 +97,138 @@ whisper audio.wav --model turbo --output_dir outputs
 
 这里的 `--output_dir` 仅控制转录文件输出，默认是当前目录；它不是 pytest 测试报告目录。
 
+## Triton 测试镜像
+
+CNPort 为各平台提供成套 Triton 验证镜像。镜像预置平台运行/编译环境和 Python 3.10，用于避免手工拼接不匹配的 Torch、Triton 与 SDK。请按下表选择与实机架构一致的镜像，不要混用不同平台镜像或使用 `latest` 标签。
+
+| 平台 | 镜像（VPC） | 标签 | 架构 |
+|---|---|---|---|
+| NVIDIA | `open-audio-native-registry-vpc.cn-beijing.cr.aliyuncs.com/hy_cnport/triton-nvidia-a40-py310` | `v1.0.0-amd64` | `amd64` |
+| 华为昇腾 | `open-audio-native-registry-vpc.cn-beijing.cr.aliyuncs.com/hy_cnport/triton-ascend-910b-py310` | `v1.0.1-arm64` | `arm64` |
+| 海光 | `open-audio-native-registry-vpc.cn-beijing.cr.aliyuncs.com/hy_cnport/triton-hygon-bw1000-py310` | `v1.0.0-amd64` | `amd64` |
+| 寒武纪 | `open-audio-native-registry.cn-beijing.cr.aliyuncs.com/hy_cnport/triton-cambricon-mlu590-py310` | `v1.0.0-amd64` | `amd64` |
+| 摩尔线程 | `open-audio-native-registry-vpc.cn-beijing.cr.aliyuncs.com/hy_cnport/triton-mtt-s5000-py310` | `v1.0.0-amd64` | `amd64` |
+| 阿里平头哥 | `open-audio-native-registry.cn-beijing.cr.aliyuncs.com/audio_generation/triton-t-head-zw810e-py310` | `v1.0.0-amd64` | `amd64` |
+
+说明：
+
+- 表中的完整镜像地址为“镜像仓库 + `:` + 标签”，例如 NVIDIA 为
+  `open-audio-native-registry-vpc.cn-beijing.cr.aliyuncs.com/hy_cnport/triton-nvidia-a40-py310:v1.0.0-amd64`。
+- VPC 地址仅用于已接入对应阿里云 VPC 的机器；公网机器应把仓库域名替换为
+  `open-audio-native-registry.cn-beijing.cr.aliyuncs.com`，仓库路径和标签保持不变。
+- 拉取私有镜像前需要使用企业账号执行 `docker login`。测试命令不会记录账号信息。
+- NVIDIA、海光和平头哥镜像以 CUDA/HIP 兼容设备名暴露运行时设备；这是平台工具链的既有行为，仍需按上表选择对应平台的镜像。
+- 镜像只解决软件环境。宿主机仍需正确安装驱动，并确保 `/dev` 设备、共享库和内核模块对容器可见。
+
 ## 测试
 
-上游 pytest 默认只向终端输出，不创建统一报告目录。CNPort 提供统一 runner：
+### 原生测试框架
+
+Whisper CNPort 直接复用上游 pytest 测试套件，并补充两个层次：
+
+1. **上游 pytest 测试**：包含音频处理（`test_audio.py`）、分词器（`test_tokenizer.py`）、文本规范化（`test_normalizer.py`）、词级时间戳（`test_timing.py`）和端到端转录（`test_transcribe.py`）。
+2. **CNPort Triton kernel 直连验证**：直接调用 `whisper/triton_ops.py` 中的 `median_kernel` 和 `dtw_kernel`，验证编译、启动和与 CPU 参考实现的等价性，防止 CPU fallback 掩盖平台 Triton 失败。
+
+测试分四个层级：
+
+| 层级 | 覆盖内容 | 是否下载模型 |
+|---|---|---|
+| `timing-kernel-probe` | 两个 Triton kernel 直连、参数化形状和 CPU 等价性 | 否 |
+| `unit` | 音频、分词器、规范化器、timing 单元测试 | 否 |
+| `unit+smoke` | unit + 一个 tiny 模型端到端冒烟 | 是 |
+| `full-integration` | `whisper.available_models()` 全部模型端到端测试 | 是 |
+
+### 使用镜像执行测试
+
+以下步骤在宿主机上执行；`<repo-root>` 为 Whisper CNPort 仓库路径。
+
+1. 登录并拉取平台镜像：
 
 ```bash
+# 公网机器
+docker login open-audio-native-registry.cn-beijing.cr.aliyuncs.com
+# 匹配 VPC 的机器
+docker login open-audio-native-registry-vpc.cn-beijing.cr.aliyuncs.com
+
+# 示例：NVIDIA A40
+docker pull open-audio-native-registry-vpc.cn-beijing.cr.aliyuncs.com/hy_cnport/triton-nvidia-a40-py310:v1.0.0-amd64
+
+# 示例：昇腾 910B（VPC 地址）
+docker pull open-audio-native-registry-vpc.cn-beijing.cr.aliyuncs.com/hy_cnport/triton-ascend-910b-py310:v1.0.1-arm64
+```
+
+2. 挂载仓库、模型缓存和 Triton 缓存后启动容器。以下为 NVIDIA 通用示例：
+
+```bash
+docker run -it --rm \
+  --gpus all \
+  --shm-size 8g \
+  -v <repo-root>:/workspace/whisper \
+  -v <model-cache>:/workspace/model-cache \
+  -v <triton-cache>:/workspace/triton-cache \
+  -e XDG_CACHE_HOME=/workspace/model-cache \
+  -e TRITON_CACHE_DIR=/workspace/triton-cache/cache \
+  open-audio-native-registry-vpc.cn-beijing.cr.aliyuncs.com/hy_cnport/triton-nvidia-a40-py310:v1.0.0-amd64 \
+  bash
+```
+
+昇腾、寒武纪、摩尔线程、海光等平台需要按厂商容器运行规范替换设备挂载，并按需设置
+`ASCEND_HOME_PATH`、`NEUWARE_HOME`、`MUSA_HOME`、`ROCM_HOME` 等环境变量。以镜像内厂商脚本为准，不要从一个平台复制另一个平台的启动参数。
+
+3. 在容器内安装当前源码并执行测试（镜像未内置测试依赖时）：
+
+```bash
+cd /workspace/whisper
+python -m pip install numba numpy tqdm more-itertools tiktoken
+python -m pip install -e . --no-deps
+python -m pip install pytest scipy
+
+python scripts/check_accelerator_env.py --platform auto
 python scripts/run_platform_tests.py --platform nvidia-a40
 ```
 
-默认产物位于：
+平台参数使用 `nvidia-a40`、`ascend`、`hygon`、`cambricon`、`musa`、`t-head`。如果 auto 检测和平头哥/CUDA 兼容设备存在歧义，请显式传入平台参数。
 
-```text
-tests/results/<platform>/<YYYYMMDDHHMMSS>/
+4. 更快的分层执行方式：
+
+```bash
+# 只验证 timing 相关测试，不下载模型
+python -m pytest tests/test_timing.py -v
+
+# 单模型冒烟
+python scripts/run_platform_tests.py --platform <platform-key> \
+  -- tests/test_transcribe.py -k "tiny.en" -v
+
+# 全模型集成测试
+python scripts/run_platform_tests.py --platform <platform-key>
 ```
 
-逐次日志和机器环境信息默认不提交 Git。发布支持声明前，应为六个平台分别保留一份经过脱敏的验证摘要。
+`scripts/run_platform_tests.py` 会在 `tests/results/<platform>/<timestamp>/` 生成 `environment.json`、`junit.xml`、`pytest.log`、`summary.json`、`command.json` 和 `report.md`。逐次日志和机器环境默认不提交 Git。
+
+### 平台测试结果
+
+下表按测试层级分别记录结果。`timing-kernel-probe` 记录两个 Triton kernel 的直连状态；`unit`、`unit+smoke`、`full-integration` 分别记录 pytest 通过数/收集数。`—` 表示该层级未单独执行，不能推断为失败。
+
+| 平台 / 设备 | 配套镜像 | Torch / Triton | `timing-kernel-probe` | `unit` | `unit+smoke` | `full-integration` | 结论 |
+|---|---|---|---|---|---|---|---|
+| NVIDIA A40 | `triton-nvidia-a40-py310:v1.0.0-amd64`（digest `sha256:70bf80ef66b4`） | `2.4.1+cu124` / `3.0.0` | ✅ 22/22（2026-09-21） | ✅ 31/31（2026-09-21） | ✅ 32/32，含 `tiny.en` 1/1（2026-09-21） | ✅ 45/45，含全模型 14/14（2026-09-21） | Triton 改写与全量移植已验证 |
+| 华为昇腾 910B | `triton-ascend-910b-py310:v1.0.1-arm64` | `2.5.1` + `torch_npu` / `3.2.0` | ✅ DTW、median 通过（2026-06-01） | ✅ 25/25（2026-06-01） | ✅ 26/26，含 `tiny.en` 1/1（2026-06-01） | — | Triton 改写与端到端冒烟已验证 |
+| 海光 BW1000 | `triton-hygon-bw1000-py310:v1.0.0-amd64` | `2.4.1` / `3.0.0` | ✅ DTW、median 通过（2026-07-22） | ✅ 27/27（2026-07-22，包含在全量执行中） | — | ✅ 41/41，含全模型 14/14（2026-07-22） | Triton 改写与全量移植已验证 |
+| 寒武纪 MLU590 | `triton-cambricon-mlu590-py310:v1.0.0-amd64` | `2.9.1` + `torch_mlu` / `3.2.0` | ⚠️ DTW 通过；median 编译失败（2026-07-22） | ✅ 27/27（2026-07-22，包含在全量执行中） | — | ⚠️ 40/41；唯一失败为 median 直连用例，功能回退通过 | 部分完成，median 未通过直连 |
+| 摩尔线程 S5000 | `triton-mtt-s5000-py310:v1.0.0-amd64` | `2.7.1` + `torch_musa` / `3.1.0` | ✅ DTW、median 通过（2026-06-02） | ✅ 25/25（2026-06-02） | ✅ 26/26，含 `tiny.en` 1/1（2026-06-02） | ✅ 39/39，含全模型 14/14（2026-06-02） | Triton 改写与全量移植已验证 |
+| 阿里平头哥 PPU-ZW810E | `triton-t-head-zw810e-py310:v1.0.0-amd64` | `2.6.0` / `3.2.0` | ✅ DTW、median 通过（2026-07-22） | ✅ 27/27（2026-07-22） | ✅ 28/28，含 `tiny.en` 1/1（2026-07-22） | — | Triton 改写与端到端冒烟已验证 |
+
+层级结果说明：
+
+- `timing-kernel-probe`：直接调用 `whisper/triton_ops.py` 的两个 kernel，并检查与 CPU 参考实现等价；✅ 表示两个 kernel 均编译并在平台设备执行。
+- `unit`：只包含音频、分词器、规范化器和 timing 单元测试；数字为通过数/收集数。
+- `unit+smoke`：在 unit 基础上额外执行一个 `tiny.en` 端到端转录用例；总数包含 unit 用例。
+- `full-integration`：执行当时 `whisper.available_models()` 的全部模型；数字为总通过数/总收集数。
+- 海光和寒武纪的全量执行已覆盖 unit 用例，因此 unit 结果来自同一轮全量执行，而非独立重复执行。
+- 表中的日期为对应层级最后一次实机执行时间。不同平台的上游模型集合和用例数量不同，不能直接横向比较 collected 数量。
+- NVIDIA A40 四个层级已于 2026-09-21 使用 `triton-nvidia-a40-py310:v1.0.0-amd64`（digest `sha256:70bf80ef66b483a2434aa4bcc4d0633d4455b681aa95b162b732288eaf452a9c`）实机复验，`full-integration` 全量结果为 45/45 通过。
+- 寒武纪 MLU590 的 40 个通过用例包含 median fallback 功能正确性，但不能证明 median kernel 已在 MLU 设备执行。
+- 除 NVIDIA A40 外，其余平台行仍为历史实机结果且未记录镜像 digest；本机没有对应国产平台硬件，尚未完成镜像复验。正式发布前应使用上表镜像重跑全部四个层级，并在 `tests/results/` 的脱敏摘要中记录镜像地址、tag/digest 和测试 commit。
 
 ## 上游与许可证
 
