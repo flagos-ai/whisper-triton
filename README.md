@@ -18,7 +18,7 @@ Whisper CNPort 基于 [OpenAI Whisper](https://github.com/openai/whisper)，目�
 |---|---|---|---|
 | NVIDIA | `cuda` | NVIDIA / cubin | PyTorch CUDA + PyPI/配套 Triton |
 | 华为昇腾 | `npu` | Ascend / npubin | `torch_npu` + 昇腾 Triton |
-| 寒武纪 | `mlu` | MLU / cnbin | **部分支持/验证中**：DTW kernel 可在 MLU 执行；median kernel 失败时自动回退 CPU |
+| 寒武纪 | `mlu` | MLU / cnbin | **部分支持/验证中**：DTW、median 两个 kernel 均可在 MLU 执行；全模型集成测试通过但推理在 CPU 执行 |
 | 摩尔线程 | `musa` | MTGPU / mubin | `torch_musa` + MUSA Triton |
 | 海光 | `cuda` 或 HIP 兼容设备 | AMD/HIP / hsaco | 厂商 PyTorch + 配套 ROCm/HIP Triton |
 | 阿里平头哥 | CUDA 兼容设备 | 平台工具链产物 | PPU SDK、厂商 PyTorch 和配套 Triton |
@@ -27,30 +27,23 @@ Whisper CNPort 基于 [OpenAI Whisper](https://github.com/openai/whisper)，目�
 
 ### 寒武纪 MLU590 当前限制
 
-2026-07-23 在 MLU590-M9、Python 3.10.12、Torch 2.9.1、
-`torch_mlu 1.30.2+torch2.9.1`、MLU Triton 3.2.0 组合上的实测结果为
-`40 passed, 1 failed`：
+2026-09-21 在 MLU590-M9、Python 3.10.12、Torch 2.9.1、
+`torch_mlu 1.30.2+torch2.9.1`、MLU Triton 3.2.0、镜像
+`triton-cambricon-mlu590-py310:v1.0.0-amd64`（digest
+`sha256:e1d9af91e311`）组合上的实测结果为 `45 passed, 0 failed`：
 
-- `dtw_kernel` 的 MLU 直连测试和 CPU 等价性测试通过。
-- 动态生成的 `median_kernel` 在 MLU Triton 编译缓存 metadata 时失败，错误为
-  `TypeError: vars() argument must have __dict__ attribute`。这是当前 MLU Triton
-  编译/序列化路径与 Whisper 动态 JIT kernel 的兼容问题，不是中值滤波数值误差。
-- 对外 API 的中值滤波功能测试可通过，因为编译失败会发出 `RuntimeWarning` 并回退到
-  CPU；这只表示功能可用，不表示 median kernel 已在 MLU 上执行，且词级时间戳会有
-  设备到 CPU 的数据传输和性能损失。
+- `dtw_kernel` 与重写后的静态 `median_kernel`（窗宽经 `tl.constexpr` 特化）的
+  MLU 直连测试和 CPU 等价性测试全部通过；timing 层级共 22/22。
+- 2026-07-23 基线中动态生成 `median_kernel` 触发的
+  `TypeError: vars() argument must have __dict__ attribute` 编译失败已由静态重写
+  解决，median 路径不再回退 CPU。
 - 上游全模型转录用例的 14 个模型名/别名均通过，但当前上游用例只在
   `torch.cuda.is_available()` 为真时选择加速器，本次实际在 CPU 执行。因此该结果不能
   作为 MLU Encoder/Decoder 全模型推理已验收的证据。
 
 基于上述结果，本仓库目前不宣称寒武纪平台已完成全栈移植。可支持的范围是：上游
-Python API、CPU 推理、MLU 张量上的 DTW Triton 路径，以及 median kernel 失败后的
-CPU 功能回退。发布“完整支持”前仍需让重写后的 kernel 与全模型转录测试显式在
-`mlu` 设备执行通过。
-
-当前开发分支已将 `median_kernel` 重写为普通的静态 Triton JIT kernel，窗宽通过
-`tl.constexpr` 特化，不再修改 `JITFunction` 源码。上面的结果仍是最近一次已完成的
-MLU 实机验证基线；在 MLU590 上重新完成 kernel 直连和端到端验收前，支持状态暂不
-提前调整。
+Python API、CPU 推理、MLU 张量上的 DTW 与 median Triton 路径。发布“完整支持”前
+仍需让全模型转录测试显式在 `mlu` 设备执行通过。
 
 ## 安装
 
@@ -214,7 +207,7 @@ python scripts/run_platform_tests.py --platform <platform-key>
 | NVIDIA A40 | `triton-nvidia-a40-py310:v1.0.0-amd64`（digest `sha256:70bf80ef66b4`） | `2.4.1+cu124` / `3.0.0` | ✅ 22/22（2026-09-21） | ✅ 31/31（2026-09-21） | ✅ 32/32，含 `tiny.en` 1/1（2026-09-21） | ✅ 45/45，含全模型 14/14（2026-09-21） | Triton 改写与全量移植已验证 |
 | 华为昇腾 910B | `triton-ascend-910b-py310:v1.0.0-arm64`（digest `sha256:b5e5c7757b23`） | `2.5.1` + `torch_npu 2.5.1` / `3.2.0` | ✅ 22/22（2026-09-21） | ✅ 31/31（2026-09-21） | ✅ 32/32，含 `tiny.en` 1/1（2026-09-21） | ✅ 45/45，含全模型 14/14（2026-09-21） | Triton 改写与全量移植已验证 |
 | 海光 BW1000 | `triton-hygon-bw1000-py310:v1.0.0-amd64`（digest `sha256:189ff4891b41`） | `2.5.1`（HIP）/ `3.0.0` | ✅ 22/22（2026-09-21） | ✅ 31/31（2026-09-21） | ✅ 32/32，含 `tiny.en` 1/1（2026-09-21） | ✅ 45/45，含全模型 14/14（2026-09-21） | Triton 改写与全量移植已验证 |
-| 寒武纪 MLU590 | `triton-cambricon-mlu590-py310:v1.0.0-amd64` | `2.9.1` + `torch_mlu` / `3.2.0` | ⚠️ DTW 通过；median 编译失败（2026-07-22） | ✅ 27/27（2026-07-22，包含在全量执行中） | — | ⚠️ 40/41；唯一失败为 median 直连用例，功能回退通过 | 部分完成，median 未通过直连 |
+| 寒武纪 MLU590 | `triton-cambricon-mlu590-py310:v1.0.0-amd64`（digest `sha256:e1d9af91e311`） | `2.9.1` + `torch_mlu` / `3.2.0` | ✅ 22/22，DTW、median 直连均通过（2026-09-21） | ✅ 31/31（2026-09-21，包含在全量执行中） | — | ✅ 45/45，含全模型 14/14（2026-09-21） | Triton 改写已验证；全模型推理仍在 CPU 执行 |
 | 摩尔线程 S5000 | `triton-mtt-s5000-py310:v1.0.0-amd64`（digest `sha256:6c5f881f6213`） | `2.7.1` + `torch_musa 2.7.0` / `3.1.0` | ✅ 22/22（2026-09-21） | ✅ 31/31（2026-09-21，包含在全量执行中） | ✅ 32/32，含 `tiny.en` 1/1（2026-09-21，包含在全量执行中） | ✅ 45/45，含全模型 14/14（2026-09-21） | Triton 改写与全量移植已验证 |
 | 阿里平头哥 PPU-ZW810E | `triton-t-head-zw810e-py310:v1.0.0-amd64`（digest `sha256:b769a84232a2`） | `2.6.0` / `3.2.0` | ✅ 22/22（2026-09-21） | ✅ 31/31（2026-09-21） | ✅ 32/32，含 `tiny.en` 1/1（2026-09-21） | ✅ 45/45，含全模型 14/14（2026-09-21） | Triton 改写与全量移植已验证 |
 
@@ -232,8 +225,7 @@ python scripts/run_platform_tests.py --platform <platform-key>
 - 海光镜像的 ROCm 版 PyTorch 未内置 SDPA GPU kernel（缺少 `flash_attn_2_cuda*.so`，Aotriton flash attention 编译期禁用），fp16 张量调用 `scaled_dot_product_attention` 会直接抛 `RuntimeError` 而不是回退。本次复验在 `whisper/model.py` 中为 SDPA 增加了异常回退：首次调用失败后自动切换到等价的手动 attention 路径并关闭 SDPA，对数值结果无影响。该改动同样惠及其他 SDPA kernel 不完整的平台。
 - 摩尔线程 S5000 四个层级已于 2026-09-21 使用 `triton-mtt-s5000-py310:v1.0.0-amd64`（digest `sha256:6c5f881f6213e427f088e168d9040781801a032a63b296d4a15e9bd8b300a74d`）在 8 卡 S5000 实机复验，`full-integration` 全量结果为 45/45 通过，结果产物存于 `tests/results/musa/20260921063732/`。
 - 阿里平头哥 PPU-ZW810E 四个层级已于 2026-09-21 使用 `triton-t-head-zw810e-py310:v1.0.0-amd64`（digest `sha256:b769a84232a2c9a84215980cdc0b1562755c21ebce73208d6a73fc63b41f23ae`）在 16 卡 PPU-ZW810E 实机复验，四个层级全部通过：`timing-kernel-probe` 22/22（DTW 与 median kernel 均在 PPU 上编译执行并通过 CPU 等价性检查）、`unit` 31/31、`unit+smoke` 32/32（含 `tiny.en`）、`full-integration` 45/45（含全部 14 个模型名/别名，junit 记录 0 失败 0 跳过）。执行环境为镜像内置的 Python 3.10.13、Torch 2.6.0、Triton 3.2.0（backend `cuda`，arch 80）、ffmpeg 4.4.2；PPU 通过 CUDA 兼容层暴露为 `cuda` 设备，`torch.cuda.is_available()` 为真，因此全部 14 个模型转录均在 PPU 设备上完成推理，不是 CPU 回退。测试机为无 docker 的 K8s pod，镜像经 registry API 拉取并解包后以其内置解释器与 SDK 直接执行；模型权重来自预置缓存，未触发网络下载。结果产物存于 `tests/results/t-head/20260921155225/`。
-- 寒武纪 MLU590 的 40 个通过用例包含 median fallback 功能正确性，但不能证明 median kernel 已在 MLU 设备执行。
-- 除 NVIDIA A40、华为昇腾 910B、海光 BW1000、摩尔线程 S5000 和阿里平头哥 PPU-ZW810E 外，其余平台行仍为历史实机结果且未记录镜像 digest；本机没有对应国产平台硬件，尚未完成镜像复验。正式发布前应使用上表镜像重跑全部四个层级，并在 `tests/results/` 的脱敏摘要中记录镜像地址、tag/digest 和测试 commit。
+- 寒武纪 MLU590 已于 2026-09-21 使用 `triton-cambricon-mlu590-py310:v1.0.0-amd64`（digest `sha256:e1d9af91e3113f3bf092b05ff4dc3d17e912bf2ed44fd9dc3561635b3aa4ec08`）在 MLU590-M9 实机复验：`timing-kernel-probe` 22/22（重写后的静态 `median_kernel` 与 `dtw_kernel` 均在 `mlu` 设备直连执行并通过 CPU 等价性检查，不再回退 CPU），`full-integration` 全量 45/45 通过（含全部 14 个模型名/别名，unit 层级 31/31 含于同一轮全量执行）。执行环境为镜像内置的 Python 3.10.12、Torch 2.9.1、`torch_mlu 1.30.2+torch2.9.1`、MLU Triton 3.2.0（backend `mlu`）、MLU 版 ffmpeg 4.4.4；模型权重来自预置缓存，未触发网络下载。上游 `test_transcribe` 用例仅在 `torch.cuda.is_available()` 为真时选择加速器，本次 14 个模型转录均在 CPU 执行，该结果不能作为 MLU Encoder/Decoder 全模型推理已验收的证据；MLU 上已验证的部分为 `timing` 两个 Triton kernel 的直连执行。结果产物存于 `tests/results/cambricon/20260921163415/`。
 
 ## 上游与许可证
 
