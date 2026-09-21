@@ -213,7 +213,7 @@ python scripts/run_platform_tests.py --platform <platform-key>
 |---|---|---|---|---|---|---|---|
 | NVIDIA A40 | `triton-nvidia-a40-py310:v1.0.0-amd64`（digest `sha256:70bf80ef66b4`） | `2.4.1+cu124` / `3.0.0` | ✅ 22/22（2026-09-21） | ✅ 31/31（2026-09-21） | ✅ 32/32，含 `tiny.en` 1/1（2026-09-21） | ✅ 45/45，含全模型 14/14（2026-09-21） | Triton 改写与全量移植已验证 |
 | 华为昇腾 910B | `triton-ascend-910b-py310:v1.0.1-arm64` | `2.5.1` + `torch_npu` / `3.2.0` | ✅ DTW、median 通过（2026-06-01） | ✅ 25/25（2026-06-01） | ✅ 26/26，含 `tiny.en` 1/1（2026-06-01） | — | Triton 改写与端到端冒烟已验证 |
-| 海光 BW1000 | `triton-hygon-bw1000-py310:v1.0.0-amd64` | `2.4.1` / `3.0.0` | ✅ DTW、median 通过（2026-07-22） | ✅ 27/27（2026-07-22，包含在全量执行中） | — | ✅ 41/41，含全模型 14/14（2026-07-22） | Triton 改写与全量移植已验证 |
+| 海光 BW1000 | `triton-hygon-bw1000-py310:v1.0.0-amd64`（digest `sha256:189ff4891b41`） | `2.5.1`（HIP）/ `3.0.0` | ✅ 22/22（2026-09-21） | ✅ 31/31（2026-09-21） | ✅ 32/32，含 `tiny.en` 1/1（2026-09-21） | ✅ 45/45，含全模型 14/14（2026-09-21） | Triton 改写与全量移植已验证 |
 | 寒武纪 MLU590 | `triton-cambricon-mlu590-py310:v1.0.0-amd64` | `2.9.1` + `torch_mlu` / `3.2.0` | ⚠️ DTW 通过；median 编译失败（2026-07-22） | ✅ 27/27（2026-07-22，包含在全量执行中） | — | ⚠️ 40/41；唯一失败为 median 直连用例，功能回退通过 | 部分完成，median 未通过直连 |
 | 摩尔线程 S5000 | `triton-mtt-s5000-py310:v1.0.0-amd64` | `2.7.1` + `torch_musa` / `3.1.0` | ✅ DTW、median 通过（2026-06-02） | ✅ 25/25（2026-06-02） | ✅ 26/26，含 `tiny.en` 1/1（2026-06-02） | ✅ 39/39，含全模型 14/14（2026-06-02） | Triton 改写与全量移植已验证 |
 | 阿里平头哥 PPU-ZW810E | `triton-t-head-zw810e-py310:v1.0.0-amd64` | `2.6.0` / `3.2.0` | ✅ DTW、median 通过（2026-07-22） | ✅ 27/27（2026-07-22） | ✅ 28/28，含 `tiny.en` 1/1（2026-07-22） | — | Triton 改写与端到端冒烟已验证 |
@@ -227,8 +227,9 @@ python scripts/run_platform_tests.py --platform <platform-key>
 - 海光和寒武纪的全量执行已覆盖 unit 用例，因此 unit 结果来自同一轮全量执行，而非独立重复执行。
 - 表中的日期为对应层级最后一次实机执行时间。不同平台的上游模型集合和用例数量不同，不能直接横向比较 collected 数量。
 - NVIDIA A40 四个层级已于 2026-09-21 使用 `triton-nvidia-a40-py310:v1.0.0-amd64`（digest `sha256:70bf80ef66b483a2434aa4bcc4d0633d4455b681aa95b162b732288eaf452a9c`）实机复验，`full-integration` 全量结果为 45/45 通过。
+- 海光 BW1000 四个层级已于 2026-09-21 使用 `triton-hygon-bw1000-py310:v1.0.0-amd64`（digest `sha256:189ff4891b413b44484af90d0d27795e0a2a2b09e583b4172a42245588724abc`，torch `2.5.1` HIP `6.3.26045`、Triton `3.0.0`、设备 `BW200, UBB BW1000`×8）实机复验，四个层级全部通过：`timing-kernel-probe` 22/22、`unit` 31/31、`unit+smoke` 32/32（含 `tiny.en`）、`full-integration` 45/45（含全部 14 个模型名/别名）。
+- 海光镜像的 ROCm 版 PyTorch 未内置 SDPA GPU kernel（缺少 `flash_attn_2_cuda*.so`，Aotriton flash attention 编译期禁用），fp16 张量调用 `scaled_dot_product_attention` 会直接抛 `RuntimeError` 而不是回退。本次复验在 `whisper/model.py` 中为 SDPA 增加了异常回退：首次调用失败后自动切换到等价的手动 attention 路径并关闭 SDPA，对数值结果无影响。该改动同样惠及其他 SDPA kernel 不完整的平台。
 - 寒武纪 MLU590 的 40 个通过用例包含 median fallback 功能正确性，但不能证明 median kernel 已在 MLU 设备执行。
-- 除 NVIDIA A40 外，其余平台行仍为历史实机结果且未记录镜像 digest；本机没有对应国产平台硬件，尚未完成镜像复验。正式发布前应使用上表镜像重跑全部四个层级，并在 `tests/results/` 的脱敏摘要中记录镜像地址、tag/digest 和测试 commit。
 
 ## 上游与许可证
 
