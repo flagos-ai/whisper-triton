@@ -75,7 +75,7 @@ pytest tests/ -m "not requires_accelerator and not requires_cuda"
 
 ### `test_timing.py` — 词级时间戳单元测试
 
-**测试对象**：`whisper/timing.py` 中的 `dtw_cpu()`、`dtw_cuda()`、`median_filter()`
+**测试对象**：`whisper/timing.py` 中的 `dtw_cpu()`、`dtw_cuda()`、`median_filter()`、`std_mean()`
 
 DTW（动态时间规整）是词级时间戳（word timestamps）功能的核心算法。
 
@@ -87,7 +87,11 @@ DTW（动态时间规整）是词级时间戳（word timestamps）功能的核�
 | `test_median_filter_accelerator_equivalence` | `requires_accelerator` | 加速器 median filter 与 CPU 结果一致 |
 | `test_median_filter_accelerator_kernel_equivalence` | `requires_accelerator` | 对多维输入和全部窗宽直接启动 Triton median kernel，避免 CPU fallback 掩盖失败 |
 | `test_median_filter_accelerator_kernel_duplicate_values` | `requires_accelerator` | 验证 Triton kernel 对重复值的中位数秩判定 |
-| `test_timing_falls_back_to_cpu` | `requires_accelerator` | 模拟 Triton 编译失败，验证两个 timing 算法回退到 CPU |
+| `test_timing_falls_back_to_cpu` | `requires_accelerator` | 模拟 Triton 编译失败，验证 timing 算法回退到 CPU |
+| `test_std_mean` | 无 | CPU std_mean 正确性：与 `torch.std_mean` 双精度参考对比，覆盖 fp32/fp16 |
+| `test_std_mean_accelerator_equivalence` | `requires_accelerator` | 加速器 Triton std_mean 与双精度参考一致 |
+| `test_std_mean_accelerator_kernel_equivalence` | `requires_accelerator` | 直接启动 Triton std_mean kernel，避免 CPU fallback 掩盖失败 |
+| `test_std_mean_falls_back_to_cpu` | `requires_accelerator` | 模拟 Triton 编译失败，验证 std_mean 回退到 CPU |
 
 ---
 
