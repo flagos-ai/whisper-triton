@@ -5,6 +5,8 @@ import sys
 import zlib
 from typing import Callable, List, Optional, TextIO
 
+import torch
+
 system_encoding = sys.getdefaultencoding()
 
 if system_encoding != "utf-8":
@@ -40,6 +42,26 @@ def optional_int(string):
 
 def optional_float(string):
     return None if string == "None" else float(string)
+
+
+def default_device() -> str:
+    """Return "cuda" if available, else the PrivateUse1 backend registered by
+    vendor extensions (torch_musa/torch_npu/torch_mlu), else "cpu".
+
+    Vendor extensions register their backend when imported; this function does
+    not import them itself, so a device is only detected if the extension has
+    already been loaded in the current process.
+    """
+    if torch.cuda.is_available():
+        return "cuda"
+    get_backend_name = getattr(torch._C, "_get_privateuse1_backend_name", None)
+    if get_backend_name is not None:
+        backend = get_backend_name()
+        if backend != "privateuseone":
+            module = getattr(torch, backend, None)
+            if module is not None and getattr(module, "is_available", lambda: False)():
+                return backend
+    return "cpu"
 
 
 def compression_ratio(text) -> float:
