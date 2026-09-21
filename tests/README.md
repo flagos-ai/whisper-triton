@@ -20,7 +20,7 @@
 
 ### `conftest.py` — pytest 全局配置
 
-注册 `requires_accelerator` marker，并保留 `requires_cuda` 作为兼容别名。测试会发现 CUDA 或由 `torch_npu`、`torch_mlu`、`torch_musa` 注册的 PrivateUse1 设备；也可用 `WHISPER_TEST_DEVICE` 显式指定厂商 PyTorch 设备。无加速器时自动跳过直连 kernel 测试。设备选择只属于测试逻辑，不修改 Whisper 的模型推理设备策略。
+注册 `requires_accelerator` marker，并保留 `requires_cuda` 作为兼容别名。测试会发现 CUDA 或由 `torch_npu`、`torch_mlu`、`torch_musa` 注册的 PrivateUse1 设备；也可用 `WHISPER_TEST_DEVICE` 显式指定厂商 PyTorch 设备。无加速器时自动跳过直连 kernel 测试。`test_transcribe.py` 单独通过 `default_device()` 探测选择设备（优先 `WHISPER_TEST_DEVICE`，无加速器时在 CPU 执行），不因缺少加速器而跳过。
 
 ```bash
 # 跳过所有加速器测试

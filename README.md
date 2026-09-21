@@ -8,7 +8,7 @@ Whisper CNPort 基于 [OpenAI Whisper](https://github.com/openai/whisper)，目�
 
 - Whisper 的 Encoder/Decoder 仍由各平台厂商提供的 PyTorch 后端执行。
 - 词级时间戳使用的 `dtw_kernel` 和 `median_kernel` 保持一份 Triton 源码，由当前环境中的平台 Triton JIT 编译。
-- 仅 `whisper/timing.py` 对非 CPU 张量尝试执行这两个 Triton kernel；Whisper 不新增厂商模型推理后端，也不替用户选择厂商设备。
+- 仅 `whisper/timing.py` 对非 CPU 张量尝试执行这两个 Triton kernel；Whisper 不新增厂商模型推理后端。默认设备通过 `whisper/utils.py` 的 `default_device()` 通用探测（CUDA → 已加载的 PrivateUse1 后端 → CPU），不维护厂商特有逻辑。
 - Triton 不再作为 Whisper 的通用安装依赖。各平台必须预先安装与本机 PyTorch、SDK 和设备后端匹配的 Triton 发行版。
 - Triton 不可用或编译失败时，词级时间戳计算会给出警告并回退到较慢的 CPU 实现。
 
@@ -78,9 +78,11 @@ result = model.transcribe("audio.mp3")
 print(result["text"])
 ```
 
-非 CUDA 平台由调用方按厂商 PyTorch 文档显式传入设备，例如
-`whisper.load_model("turbo", device="<torch-device>")`。CNPort 不在产品代码中维护
-NPU、MLU、MUSA 等模型推理设备的探测或调度逻辑。
+`whisper.load_model()` 与 CLI 的默认设备通过 `default_device()` 探测：优先 CUDA，
+其次检测已 import 的厂商 PrivateUse1 后端（`torch_musa`/`torch_npu`/`torch_mlu`），
+无加速器时回退 CPU。先 `import torch_musa`（或对应扩展）再调用 `load_model()` 即可
+默认落在 `musa:0` 等厂商设备上；未 import 厂商扩展时仍回退 CPU，此时显式传入设备，
+例如 `whisper.load_model("turbo", device="musa")`。显式传入的设备始终优先。
 
 命令行示例：
 
