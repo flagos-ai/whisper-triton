@@ -120,13 +120,20 @@ class MultiHeadAttention(nn.Module):
         k = k.view(*k.shape[:2], self.n_head, -1).permute(0, 2, 1, 3)
         v = v.view(*v.shape[:2], self.n_head, -1).permute(0, 2, 1, 3)
 
-        if SDPA_AVAILABLE and MultiHeadAttention.use_sdpa:
-            a = scaled_dot_product_attention(
-                q, k, v, is_causal=mask is not None and n_ctx > 1
-            )
-            out = a.permute(0, 2, 1, 3).flatten(start_dim=2)
-            qk = None
-        else:
+        use_sdpa = SDPA_AVAILABLE and MultiHeadAttention.use_sdpa
+        if use_sdpa:
+            try:
+                a = scaled_dot_product_attention(
+                    q, k, v, is_causal=mask is not None and n_ctx > 1
+                )
+                out = a.permute(0, 2, 1, 3).flatten(start_dim=2)
+                qk = None
+            except RuntimeError:
+                # Some vendor builds raise instead of falling back when no SDPA
+                # kernel is shipped (e.g. missing flash_attn_2 libraries).
+                MultiHeadAttention.use_sdpa = False
+                use_sdpa = False
+        if not use_sdpa:
             qk = (q * scale) @ (k * scale).transpose(-1, -2)
             if mask is not None:
                 qk = qk + mask[:n_ctx, :n_ctx]
