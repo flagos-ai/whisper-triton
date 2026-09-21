@@ -216,7 +216,7 @@ python scripts/run_platform_tests.py --platform <platform-key>
 | 海光 BW1000 | `triton-hygon-bw1000-py310:v1.0.0-amd64`（digest `sha256:189ff4891b41`） | `2.5.1`（HIP）/ `3.0.0` | ✅ 22/22（2026-09-21） | ✅ 31/31（2026-09-21） | ✅ 32/32，含 `tiny.en` 1/1（2026-09-21） | ✅ 45/45，含全模型 14/14（2026-09-21） | Triton 改写与全量移植已验证 |
 | 寒武纪 MLU590 | `triton-cambricon-mlu590-py310:v1.0.0-amd64` | `2.9.1` + `torch_mlu` / `3.2.0` | ⚠️ DTW 通过；median 编译失败（2026-07-22） | ✅ 27/27（2026-07-22，包含在全量执行中） | — | ⚠️ 40/41；唯一失败为 median 直连用例，功能回退通过 | 部分完成，median 未通过直连 |
 | 摩尔线程 S5000 | `triton-mtt-s5000-py310:v1.0.0-amd64`（digest `sha256:6c5f881f6213`） | `2.7.1` + `torch_musa 2.7.0` / `3.1.0` | ✅ 22/22（2026-09-21） | ✅ 31/31（2026-09-21，包含在全量执行中） | ✅ 32/32，含 `tiny.en` 1/1（2026-09-21，包含在全量执行中） | ✅ 45/45，含全模型 14/14（2026-09-21） | Triton 改写与全量移植已验证 |
-| 阿里平头哥 PPU-ZW810E | `triton-t-head-zw810e-py310:v1.0.0-amd64` | `2.6.0` / `3.2.0` | ✅ DTW、median 通过（2026-07-22） | ✅ 27/27（2026-07-22） | ✅ 28/28，含 `tiny.en` 1/1（2026-07-22） | — | Triton 改写与端到端冒烟已验证 |
+| 阿里平头哥 PPU-ZW810E | `triton-t-head-zw810e-py310:v1.0.0-amd64`（digest `sha256:b769a84232a2`） | `2.6.0` / `3.2.0` | ✅ 22/22（2026-09-21） | ✅ 31/31（2026-09-21） | ✅ 32/32，含 `tiny.en` 1/1（2026-09-21） | ✅ 45/45，含全模型 14/14（2026-09-21） | Triton 改写与全量移植已验证 |
 
 层级结果说明：
 
@@ -231,8 +231,9 @@ python scripts/run_platform_tests.py --platform <platform-key>
 - 海光 BW1000 四个层级已于 2026-09-21 使用 `triton-hygon-bw1000-py310:v1.0.0-amd64`（digest `sha256:189ff4891b413b44484af90d0d27795e0a2a2b09e583b4172a42245588724abc`，torch `2.5.1` HIP `6.3.26045`、Triton `3.0.0`、设备 `BW200, UBB BW1000`×8）实机复验，四个层级全部通过：`timing-kernel-probe` 22/22、`unit` 31/31、`unit+smoke` 32/32（含 `tiny.en`）、`full-integration` 45/45（含全部 14 个模型名/别名）。
 - 海光镜像的 ROCm 版 PyTorch 未内置 SDPA GPU kernel（缺少 `flash_attn_2_cuda*.so`，Aotriton flash attention 编译期禁用），fp16 张量调用 `scaled_dot_product_attention` 会直接抛 `RuntimeError` 而不是回退。本次复验在 `whisper/model.py` 中为 SDPA 增加了异常回退：首次调用失败后自动切换到等价的手动 attention 路径并关闭 SDPA，对数值结果无影响。该改动同样惠及其他 SDPA kernel 不完整的平台。
 - 摩尔线程 S5000 四个层级已于 2026-09-21 使用 `triton-mtt-s5000-py310:v1.0.0-amd64`（digest `sha256:6c5f881f6213e427f088e168d9040781801a032a63b296d4a15e9bd8b300a74d`）在 8 卡 S5000 实机复验，`full-integration` 全量结果为 45/45 通过，结果产物存于 `tests/results/musa/20260921063732/`。
+- 阿里平头哥 PPU-ZW810E 四个层级已于 2026-09-21 使用 `triton-t-head-zw810e-py310:v1.0.0-amd64`（digest `sha256:b769a84232a2c9a84215980cdc0b1562755c21ebce73208d6a73fc63b41f23ae`）在 16 卡 PPU-ZW810E 实机复验，四个层级全部通过：`timing-kernel-probe` 22/22（DTW 与 median kernel 均在 PPU 上编译执行并通过 CPU 等价性检查）、`unit` 31/31、`unit+smoke` 32/32（含 `tiny.en`）、`full-integration` 45/45（含全部 14 个模型名/别名，junit 记录 0 失败 0 跳过）。执行环境为镜像内置的 Python 3.10.13、Torch 2.6.0、Triton 3.2.0（backend `cuda`，arch 80）、ffmpeg 4.4.2；PPU 通过 CUDA 兼容层暴露为 `cuda` 设备，`torch.cuda.is_available()` 为真，因此全部 14 个模型转录均在 PPU 设备上完成推理，不是 CPU 回退。测试机为无 docker 的 K8s pod，镜像经 registry API 拉取并解包后以其内置解释器与 SDK 直接执行；模型权重来自预置缓存，未触发网络下载。结果产物存于 `tests/results/t-head/20260921155225/`。
 - 寒武纪 MLU590 的 40 个通过用例包含 median fallback 功能正确性，但不能证明 median kernel 已在 MLU 设备执行。
-- 除 NVIDIA A40、华为昇腾 910B、海光 BW1000 和摩尔线程 S5000 外，其余平台行仍为历史实机结果且未记录镜像 digest；本机没有对应国产平台硬件，尚未完成镜像复验。正式发布前应使用上表镜像重跑全部四个层级，并在 `tests/results/` 的脱敏摘要中记录镜像地址、tag/digest 和测试 commit。
+- 除 NVIDIA A40、华为昇腾 910B、海光 BW1000、摩尔线程 S5000 和阿里平头哥 PPU-ZW810E 外，其余平台行仍为历史实机结果且未记录镜像 digest；本机没有对应国产平台硬件，尚未完成镜像复验。正式发布前应使用上表镜像重跑全部四个层级，并在 `tests/results/` 的脱敏摘要中记录镜像地址、tag/digest 和测试 commit。
 
 ## 上游与许可证
 
