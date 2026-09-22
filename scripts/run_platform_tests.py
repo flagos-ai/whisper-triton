@@ -104,6 +104,12 @@ def main() -> int:
         "--output-root", type=Path, default=REPO_ROOT / "tests" / "results"
     )
     parser.add_argument(
+        "--test-paths",
+        nargs="+",
+        default=["tests/"],
+        help="test paths to pass to pytest (default: tests/)",
+    )
+    parser.add_argument(
         "--output-dir", type=Path, help="override the timestamped result directory"
     )
     parser.add_argument(
@@ -137,7 +143,7 @@ def main() -> int:
         sys.executable,
         "-m",
         "pytest",
-        "tests/",
+        *args.test_paths,
         "-v",
         f"--junitxml={junit_path}",
         *extra_args,
@@ -156,7 +162,7 @@ def main() -> int:
                 "current-python",
                 "-m",
                 "pytest",
-                "tests/",
+                *args.test_paths,
                 "-v",
                 "--junitxml=<result>/junit.xml",
                 *extra_args,
