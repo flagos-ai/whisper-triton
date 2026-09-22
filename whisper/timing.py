@@ -56,6 +56,30 @@ def median_filter(x: torch.Tensor, filter_width: int):
     return result
 
 
+def std_mean(x: torch.Tensor, dim: int):
+    """Compute the biased std and mean of `x` along `dim`, keeping the dim
+
+    Equivalent to ``torch.std_mean(x, dim=dim, keepdim=True, unbiased=False)``,
+    which some vendor PyTorch builds do not implement.
+    """
+    assert dim == -2, "the Triton std_mean kernel only reduces dim=-2"
+    if x.device.type != "cpu":
+        try:
+            from .triton_ops import std_mean_cuda
+
+            return std_mean_cuda(x)
+        except Exception as exc:
+            warnings.warn(
+                "Failed to compile or launch the Triton std_mean"
+                f" kernel on {x.device}"
+                f" ({type(exc).__name__}: {exc}); falling back to CPU",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+
+    return torch.std_mean(x.cpu(), dim=dim, keepdim=True, unbiased=False)
+
+
 @numba.jit(nopython=True)
 def backtrace(trace: np.ndarray):
     i = trace.shape[0] - 1
@@ -211,7 +235,7 @@ def find_alignment(
     weights = torch.stack([QKs[_l][_h] for _l, _h in model.alignment_heads.indices().T])
     weights = weights[:, :, : num_frames // 2]
     weights = (weights * qk_scale).softmax(dim=-1)
-    std, mean = torch.std_mean(weights, dim=-2, keepdim=True, unbiased=False)
+    std, mean = std_mean(weights, dim=-2)
     weights = (weights - mean) / std
     weights = median_filter(weights, medfilt_width)
 

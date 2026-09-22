@@ -3,14 +3,16 @@
 ## 移植边界
 
 Whisper 模型的 Encoder/Decoder 推理保持上游 PyTorch 实现。各平台负责提供可用的
-PyTorch、设备扩展和设备字符串；CNPort 不实现厂商推理后端，也不修改 CLI 或
-`load_model()` 的上游默认设备策略。
+PyTorch、设备扩展和设备字符串；CNPort 不实现厂商推理后端。`whisper.load_model()`
+与 CLI 的默认设备通过 `whisper/utils.py` 的 `default_device()` 统一探测：优先
+CUDA，其次检测已加载的 PrivateUse1 后端（`torch_musa`/`torch_npu`/`torch_mlu`
+等在 import 时注册），否则回退 CPU。显式传入的设备始终优先于探测结果。
 
 CNPort 的运行时代码适配仅覆盖 `whisper/timing.py` 中已有 Triton 源码的
-`median_kernel` 和 `dtw_kernel`。输入位于非 CPU 设备时，代码尝试用该环境的
-Triton 编译并启动 kernel；Triton 不可用、编译失败或启动失败时，这两项计算回退到
-CPU。平台测试可以通过 `WHISPER_TEST_DEVICE` 显式指定 PyTorch 测试设备，但该变量
-只由 pytest 使用，不改变 Whisper 运行时行为。
+`median_kernel`、`dtw_kernel` 和 `std_mean_kernel`。输入位于非 CPU 设备时，代码
+尝试用该环境的 Triton 编译并启动 kernel；Triton 不可用、编译失败或启动失败时，
+这些计算回退到 CPU。平台测试可以通过 `WHISPER_TEST_DEVICE` 显式指定 PyTorch
+测试设备，`tests/test_transcribe.py` 同样读取该变量。
 
 ## 为什么不再自动安装 Triton
 
@@ -100,13 +102,15 @@ python scripts/run_platform_tests.py --platform <platform-key>
 
 runner 执行环境检查后运行 `pytest tests/ -v`。`test_timing.py` 同时包含直接调用 Triton kernel 的测试，Triton 失败后走 CPU fallback 不能让直连测试误报成功。集成测试覆盖当前提交中 `whisper.available_models()` 返回的所有模型，因此模型集合随上游版本变化而自动更新。
 
-支持验收要求：环境检查通过、CPU 单测通过、两个 timing kernel 直连且与 CPU 结果等价、全模型集成测试通过、tiny 模型开启词级时间戳后端到端通过。
+支持验收要求：环境检查通过、CPU 单测通过、三个 timing kernel 直连且与 CPU 结果等价、全模型集成测试通过、tiny 模型开启词级时间戳后端到端通过。
 
-注意：当前上游 `tests/test_transcribe.py` 只根据 `torch.cuda.is_available()` 选择
-CUDA 或 CPU，不读取 `WHISPER_TEST_DEVICE`。因此非 CUDA 平台即使设备探测成功，
-该文件通过也只证明 CPU 转录路径。非 CUDA 平台的发布验收必须另行运行显式传入
-厂商设备的全模型用例；后续应让转录集成测试复用 pytest 的统一 accelerator fixture，
-并在测试摘要中记录每个模型的实际 `model.device`。
+`tests/test_transcribe.py` 通过 `_transcribe_device()` 选择设备：优先
+`WHISPER_TEST_DEVICE`，否则使用 `default_device()` 的探测结果（CUDA、已加载的
+PrivateUse1 后端，无加速器时 CPU）。非 CUDA 平台在加载了设备扩展后，集成测试
+会真实在厂商设备上执行。词级时间戳的 `std_mean` 计算同样通过 Triton kernel
+执行（`whisper/timing.py` 的 `std_mean()`）；部分厂商 PyTorch（如 `torch_musa
+2.7.0`）缺失 `aten::std_mean.correction` 原生算子，Triton kernel 补齐了这一
+缺口，词级时间戳断言在所有平台均执行，不做跳过。
 
 ## 输出约定
 
